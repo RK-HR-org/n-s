@@ -1,4 +1,4 @@
-export const API_URL = 'https://api.546735-cx01414.tmweb.ru';
+export const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function apiClient<T>(
     endpoint: string,
