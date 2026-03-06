@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
-  NForm, NFormItem, NInput, NSelect, NButton, NSpace, NDivider, NGrid, NFormItemGi, NInputNumber, NCard, NText, NTreeSelect, NDatePicker, NCollapse, NCollapseItem, NDynamicInput, NIcon, NAutoComplete
+  NForm, NFormItem, NInput, NSelect, NButton, NSpace, NDivider, NGrid, NFormItemGi, NInputNumber, NCard, NText, NTreeSelect, NDatePicker, NCollapse, NCollapseItem, NDynamicInput, NIcon, NAutoComplete, NTooltip
 } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { useDictionaryStore } from '@/entities/dictionary'
@@ -199,35 +199,44 @@ const handleSearch = async () => {
       
 
       <!-- AI Enrichment Section -->
-      <n-collapse>
-        <n-collapse-item name="ai-search">
-          <template #header>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <n-icon :component="SparklesIcon" size="20" color="#F74C00" />
-              <span>Умный поиск (AI)</span>
-            </div>
-          </template>
-          <n-grid :cols="1" y-gap="12">
-            <n-form-itemGi label="Опишите, кто вам нужен (Позитивный промпт)">
-              <n-input
-                v-model:value="positivePrompt"
-                type="textarea"
-                placeholder="Например: Бухгалтер-кассир>"
-              />
-            </n-form-itemGi>
-            <n-form-itemGi label="Опишите, кто вам НЕ нужен (Негативный промпт)">
-              <n-input
-                v-model:value="negativePrompt"
-                type="textarea"
-                placeholder="Например: без удаленки, не джуниор"
-              />
-            </n-form-itemGi>
-          </n-grid>
-          <n-button type="info" secondary block style="margin-top: 12px;" @click="handleEnrich" :loading="searchStore.isEnriching">
-            Автозаполнение фильтров с помощью AI
-          </n-button>
-        </n-collapse-item>
-      </n-collapse>
+      <n-tooltip trigger="hover" placement="top">
+        <template #trigger>
+          <div style="width: 100%;">
+            <n-collapse>
+              <n-collapse-item name="ai-search" disabled>
+                <template #header>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <n-icon :component="SparklesIcon" size="20" color="#F74C00" />
+                    <span style="color: var(--n-text-color-disabled);">Умный поиск (AI)</span>
+                  </div>
+                </template>
+                <n-grid :cols="1" y-gap="12">
+                  <n-form-itemGi label="Опишите, кто вам нужен (Позитивный промпт)">
+                    <n-input
+                      v-model:value="positivePrompt"
+                      type="textarea"
+                      placeholder="Например: Бухгалтер-кассир>"
+                      disabled
+                    />
+                  </n-form-itemGi>
+                  <n-form-itemGi label="Опишите, кто вам НЕ нужен (Негативный промпт)">
+                    <n-input
+                      v-model:value="negativePrompt"
+                      type="textarea"
+                      placeholder="Например: без удаленки, не джуниор"
+                      disabled
+                    />
+                  </n-form-itemGi>
+                </n-grid>
+                <n-button type="info" secondary block style="margin-top: 12px;" @click="handleEnrich" :loading="searchStore.isEnriching" disabled>
+                  Автозаполнение фильтров с помощью AI
+                </n-button>
+              </n-collapse-item>
+            </n-collapse>
+          </div>
+        </template>
+        Функция в разработке
+      </n-tooltip>
 
       <n-divider style="margin: 12px 0;" />
 

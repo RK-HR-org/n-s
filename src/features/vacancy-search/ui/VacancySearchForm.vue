@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
-  NForm, NFormItem, NInput, NSelect, NButton, NSpace, NDivider, NGrid, NFormItemGi, NInputNumber, NCard, NText, NTreeSelect, NCollapse, NCollapseItem, NDynamicInput, NIcon, NAutoComplete, NTooltip
+  NForm, NFormItem, NInput, NSelect, NButton, NSpace, NDivider, NGrid, NFormItemGi, NInputNumber, NCard, NText, NTreeSelect, NCollapse, NCollapseItem, NDynamicInput, NIcon, NAutoComplete, NTooltip, useMessage
 } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { useDictionaryStore } from '@/entities/dictionary'
@@ -15,6 +15,7 @@ import { useUserStore } from '@/entities/user'
 import { staticApi } from '@/shared/api'
 
 const userStore = useUserStore()
+const message = useMessage()
 
 
 const selectedTeamId = ref(userStore.user?.teams?.[0]?.id || userStore.user?.teams?.[0] || null)
@@ -70,12 +71,13 @@ const roleOptions = computed(() => {
 // Full form model (from store)
 const { draftFilters: formModel } = storeToRefs(searchStore)
 
-// Vacancy text query: 'field' must be from TextQueryDTO enum (backend validates it)
-// For vacancies we just use 'everywhere' — the scope (name/description) is set via searchField filter
+// Vacancy text query: backend validates 'field' strictly against TextQueryDTO enum (resume-style fields).
+// Для поиска вакансий отправляем 'everywhere', а конкретные области (название, компания, описание)
+// задаются отдельным фильтром searchField.
 const TEXT_QUERY_FIELDS = [
-  { value: 'everywhere', label: 'Везде' },
-  { value: 'title', label: 'В названии вакансии' },
-  { value: 'experience_company', label: 'В компании' },
+  { value: 'name', label: 'В названии вакансии' },
+  { value: 'company_name', label: 'В названии компании' },
+  { value: 'description', label: 'В описании вакансии' }
 ]
 
 const TEXT_QUERY_LOGIC = [
@@ -183,17 +185,6 @@ const handleSearch = async () => {
     const raw = JSON.parse(JSON.stringify(formModel.value))
     const vacancyLabels = Array.isArray(raw.vacancyLabels) ? raw.vacancyLabels : null
 
-    // Remove new vacancy UI fields not yet supported by the backend DTO
-    delete raw.workFormat
-    delete raw.employmentForm
-    delete raw.workScheduleByDays
-    delete raw.workingHours
-    delete raw.vacancyLabels
-
-    // Remove UI-only helpers
-    delete raw.position
-    delete raw.searchPeriod
-
     // Build clean filters: only include fields with actual values
     const filters: Record<string, any> = {}
 
@@ -203,13 +194,22 @@ const handleSearch = async () => {
     }
 
     // Text queries: collect non-empty ones + position phrase
-    const textQueries: any[] = (raw.textQueries || []).filter((q: any) => q.text?.trim())
+    const textQueries: any[] = (raw.textQueries || [])
+      .filter((q: any) => q.text?.trim())
+      .map((q: any) => ({
+        text: q.text.trim(),
+        logic: q.logic || 'all',
+        // Для вакансий всегда ищем "везде", конкретные области задаются через searchField
+        field: 'everywhere'
+        // 'period' is not supported for vacancy text queries
+      }))
+
     if (formModel.value.position?.trim()) {
       textQueries.push({
         text: formModel.value.position.trim(),
         logic: 'phrase',
-        field: 'title',
-        period: 'all_time'
+        // По должности тоже ищем "везде", а область уточняется через searchField
+        field: 'everywhere'
       })
     }
     if (textQueries.length > 0) {
@@ -228,22 +228,36 @@ const handleSearch = async () => {
       if (metroNums.length > 0) filters.metro = metroNums
     }
 
-    // Salary — only include currency if there's at least one salary bound
-    if (raw.salaryFrom) filters.salaryFrom = raw.salaryFrom
-    if (raw.salaryTo) filters.salaryTo = raw.salaryTo
-    if ((filters.salaryFrom || filters.salaryTo) && raw.currency) {
-      filters.currency = raw.currency
+    // Salary — HH vacancies API expects single `salary` + `currency`
+    if (raw.salary) {
+      filters.salary = raw.salary
+      if (raw.currency) {
+        filters.currency = raw.currency
+      }
     }
 
     // Simple array/string fields — only include if non-empty
     const arrayFields = [
       'experience', 'educationLevels', 'driverLicenseTypes',
-      'professionalRole', 'searchField'
+      'professionalRole', 'searchField', 'employment', 'schedule'
     ] as const
+
+    // Map vacancy-specific UI field names to standard DTO names
+    if (Array.isArray(raw.employmentForm) && raw.employmentForm.length > 0) {
+      raw.employment = raw.employmentForm
+    }
+    if (Array.isArray(raw.workScheduleByDays) && raw.workScheduleByDays.length > 0) {
+      raw.schedule = raw.workScheduleByDays
+    }
+
     for (const key of arrayFields) {
       const val = raw[key]
       if (Array.isArray(val) && val.length > 0) {
-        filters[key] = val
+        if (key === 'professionalRole') {
+          filters[key] = val.map(Number).filter(v => !isNaN(v))
+        } else {
+          filters[key] = val
+        }
       }
     }
 
@@ -268,10 +282,15 @@ const handleSearch = async () => {
       console.error('Team not selected')
     }
 
-    console.log('Vacancy search payload:', filters)
-    await searchStore.submitSearch(filters as any, selectedTeamId.value || undefined, vacancyLabels)
-  } catch (e) {
-    console.error('Search initiation failed', e)
+    console.log('Vacancy search filters:', filters)
+    const sessionId = await searchStore.submitSearch(filters as any, selectedTeamId.value || undefined, vacancyLabels)
+    if (sessionId) {
+      message.success('Поиск успешно запущен')
+    }
+  } catch (e: any) {
+    console.error('Search initiation failed:', e)
+    const errorText = e.message || 'Неизвестная ошибка'
+    message.error(`Ошибка при запуске поиска: ${errorText}`)
   }
 }
 </script>
@@ -420,11 +439,8 @@ const handleSearch = async () => {
             <n-form-itemGi label="Валюта">
               <n-select v-model:value="formModel.currency" :options="CURRENCY_OPTIONS" />
             </n-form-itemGi>
-            <n-form-itemGi label="Зарплата от">
-              <n-input-number v-model:value="formModel.salaryFrom" clearable />
-            </n-form-itemGi>
-            <n-form-itemGi label="Зарплата до">
-              <n-input-number v-model:value="formModel.salaryTo" clearable />
+            <n-form-itemGi label="Зарплата">
+              <n-input-number v-model:value="formModel.salary" clearable />
             </n-form-itemGi>
           </n-grid>
 
