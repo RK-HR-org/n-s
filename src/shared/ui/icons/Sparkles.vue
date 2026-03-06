@@ -5,6 +5,6 @@
 
 <script>
 export default {
-  name: 'SparklesIcon'
+  name: 'OcticonSparklesFill16'
 }
 </script>

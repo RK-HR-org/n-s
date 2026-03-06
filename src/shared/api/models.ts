@@ -1,4 +1,5 @@
 // Типы из OpenAPI схемы (c:\Projects\n-s\.agents\skills\backend-api-expert\references\openapi.json)
+import type { PermissionType } from './team';
 
 export interface LoginRequest {
     email: string;

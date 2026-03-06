@@ -23,5 +23,7 @@ export async function apiClient<T>(
         throw new Error(errorData?.detail || `API Error: ${response.status}`);
     }
 
-    return response.json();
+    const contentLength = response.headers.get('Content-Length');
+    const hasBody = response.status !== 204 && contentLength !== '0';
+    return hasBody ? response.json() : (undefined as unknown as T);
 }

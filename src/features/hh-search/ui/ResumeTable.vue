@@ -43,6 +43,8 @@ const createColumns = () => {
     {
       title: 'Фото',
       key: 'photo',
+      resizable: true,
+      minWidth: 60,
       render(row: any) {
         return h(NAvatar, {
           src: row.photo?.small || undefined,
@@ -54,6 +56,8 @@ const createColumns = () => {
     {
       title: 'Кандидат',
       key: 'candidate',
+      resizable: true,
+      minWidth: 200,
       render(row: any) {
         return h(NSpace, { vertical: true, size: 'small' }, {
           default: () => [
@@ -66,6 +70,8 @@ const createColumns = () => {
     {
       title: 'Желаемая должность',
       key: 'title',
+      resizable: true,
+      minWidth: 200,
       render(row: any) {
         return h(NText, { type: 'info', strong: true }, { default: () => row.title || 'Без названия' })
       }
@@ -74,6 +80,8 @@ const createColumns = () => {
       title: 'Зарплата',
       key: 'salary',
       sorter: true,
+      resizable: true,
+      minWidth: 120,
       render(row: any) {
         if (!row.salary || !row.salary.amount) return h(NText, { depth: 3 }, { default: () => 'Не указана' })
         return h(NText, null, { default: () => row.salary.amount.toLocaleString('ru-RU') })
@@ -83,6 +91,8 @@ const createColumns = () => {
       title: 'Опыт работы',
       key: 'experience',
       sorter: true,
+      resizable: true,
+      minWidth: 120,
       render(row: any) {
         return getExperienceStr(row.total_experience?.months)
       }
@@ -90,6 +100,8 @@ const createColumns = () => {
     {
       title: 'Последнее место',
       key: 'last_job',
+      resizable: true,
+      minWidth: 200,
       render(row: any) {
         const last = row.experience?.[0]
         if (!last) return '—'
@@ -104,6 +116,8 @@ const createColumns = () => {
     {
       title: 'Город',
       key: 'area',
+      resizable: true,
+      minWidth: 120,
       render(row: any) {
         return row.area?.name || '—'
       }
@@ -111,6 +125,8 @@ const createColumns = () => {
     {
       title: 'Действия',
       key: 'actions',
+      resizable: true,
+      minWidth: 200,
       render(row: any) {
          return h(NSpace, { size: 'small' }, {
            default: () => [

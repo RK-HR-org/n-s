@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
-  NForm, NFormItem, NInput, NSelect, NButton, NSpace, NDivider, NGrid, NFormItemGi, NInputNumber, NCard, NText, NTreeSelect, NDatePicker, NCollapse, NCollapseItem, NDynamicInput, NIcon
+  NForm, NFormItem, NInput, NSelect, NButton, NSpace, NDivider, NGrid, NFormItemGi, NInputNumber, NCard, NText, NTreeSelect, NDatePicker, NCollapse, NCollapseItem, NDynamicInput, NIcon, NAutoComplete
 } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { useDictionaryStore } from '@/entities/dictionary'
@@ -12,18 +12,10 @@ import {
 import SparklesIcon from '@/shared/ui/icons/SparklesIcon.vue'
 import { useSearchStore } from '../model/useSearchStore'
 import { useUserStore } from '@/entities/user'
+import { staticApi } from '@/shared/api'
 
 const userStore = useUserStore()
 
-const teamOptions = computed(() => {
-  return userStore.user?.teams?.map(team => {
-    const teamId = team.id || team
-    return {
-      label: `Команда ${String(teamId).slice(0, 8)}...`,
-      value: teamId
-    }
-  }) || []
-})
 
 const selectedTeamId = ref(userStore.user?.teams?.[0]?.id || userStore.user?.teams?.[0] || null)
 
@@ -76,57 +68,8 @@ const roleOptions = computed(() => {
   }))
 })
 
-// Full form model
-const formModel = ref({
-  // Text search
-  textQueries: [{ text: '', logic: 'all', field: 'everywhere', period: 'all_time' }], 
-  
-  // Demography
-  ageFrom: null as number | null,
-  ageTo: null as number | null,
-  gender: null as string | null,
-  labels: null as string[] | null,
-
-  // Geography & Relocation
-  areas: null as string[] | null,
-  relocation: null as string | null,
-  metro: null as string | null, // Input for now
-  district: null as string | null,
-  citizenship: null as string[] | null,
-  workTicket: null as string[] | null,
-  businessTripReadiness: null as string[] | null,
-
-  // Dates
-  period: null as number | null,
-  dateFrom: null as number | null, // Timestamp for datepicker
-  dateTo: null as number | null,
-
-  // Education/Experience
-  educationLevels: null as string[] | null,
-  educationalInstitution: null as string | null,
-  experience: null as string[] | null,
-  filterExpIndustry: null as string[] | null,
-  filterExpPeriod: null as string | null,
-
-  // Employment/Schedule/Skills
-  employment: null as string[] | null,
-  schedule: null as string[] | null,
-  skills: null as string[] | null, // tags
-  languages: null as string | null, // simplified Input for language filter
-  driverLicenseTypes: null as string[] | null,
-
-  // Salary
-  salaryFrom: null as number | null,
-  salaryTo: null as number | null,
-  currency: 'RUR',
-
-  // Professional Role & Status
-  professionalRole: null as string[] | null,
-  jobSearchStatus: null as string[] | null,
-
-  // Pagination / Sorting
-  orderBy: 'relevance'
-})
+// Full form model (from store)
+const { draftFilters: formModel } = storeToRefs(searchStore)
 
 const TEXT_QUERY_FIELDS = [
   { value: 'everywhere', label: 'Везде' },
@@ -162,6 +105,46 @@ const onCreateTextQuery = () => {
   }
 }
 
+// Suggestions logic
+const positionOptions = ref<{label: string, value: string}[]>([])
+const keywordOptions = ref<{label: string, value: string}[]>([])
+let positionSuggestTimer: number | undefined
+let keywordSuggestTimer: number | undefined
+
+const handlePositionSearch = async (query: string) => {
+  if (!query || query.length < 3) {
+    positionOptions.value = []
+    return
+  }
+  if (positionSuggestTimer) window.clearTimeout(positionSuggestTimer)
+  positionSuggestTimer = window.setTimeout(async () => {
+  try {
+    const suggestions = await staticApi.getPositionsSuggestions(query)
+    positionOptions.value = suggestions.map(s => ({ label: s, value: s }))
+  } catch (e) {
+    console.error('Failed to fetch suggestions', e)
+    positionOptions.value = []
+  }
+  }, 250)
+}
+
+const handleKeywordSearch = (query: string) => {
+  if (!query || query.length < 3) {
+    keywordOptions.value = []
+    return
+  }
+  if (keywordSuggestTimer) window.clearTimeout(keywordSuggestTimer)
+  keywordSuggestTimer = window.setTimeout(async () => {
+    try {
+      const suggestions = await staticApi.getResumeKeywordSuggestions(query)
+      keywordOptions.value = suggestions.map(s => ({ label: s, value: s }))
+    } catch (e) {
+      console.error('Failed to fetch keyword suggestions', e)
+      keywordOptions.value = []
+    }
+  }, 250)
+}
+
 const handleSearch = async () => {
   try {
     console.log('Searching with model:', formModel.value)
@@ -176,6 +159,24 @@ const handleSearch = async () => {
     
     // Remove empty text queries
     filters.textQueries = filters.textQueries.filter((q: any) => q.text.trim() !== '')
+
+    // Handle Search Period
+    if (filters.searchPeriod) {
+      filters.period = filters.searchPeriod
+    }
+    delete filters.searchPeriod
+
+    // Handle position
+    if (filters.position && filters.position.trim() !== '') {
+      filters.textQueries.push({
+        text: filters.position.trim(),
+        logic: 'phrase',
+        field: 'title',
+        period: 'all_time'
+      })
+    }
+    delete filters.position
+
     if (filters.textQueries.length === 0) {
        delete filters.textQueries
     }
@@ -196,12 +197,6 @@ const handleSearch = async () => {
   <n-card bordered :content-style="{ padding: '16px' }">
     <n-space vertical size="large">
       
-      <!-- Team Selector -->
-      <n-form-item label="Команда для поиска (Обязательно для API)">
-        <n-select v-model:value="selectedTeamId" :options="teamOptions" placeholder="Выберите команду из вашего профиля" clearable />
-      </n-form-item>
-
-      <n-divider style="margin: 0;" />
 
       <!-- AI Enrichment Section -->
       <n-collapse>
@@ -217,7 +212,7 @@ const handleSearch = async () => {
               <n-input
                 v-model:value="positivePrompt"
                 type="textarea"
-                placeholder="Например: ищем Senior Frontend разработчика, опыт Vue 3 и Node.js от 5 лет, знание FSD"
+                placeholder="Например: Бухгалтер-кассир>"
               />
             </n-form-itemGi>
             <n-form-itemGi label="Опишите, кто вам НЕ нужен (Негативный промпт)">
@@ -241,6 +236,29 @@ const handleSearch = async () => {
         <n-text depth="3" style="margin-bottom: 8px; display: block;">Ручные фильтры поиска</n-text>
 
         <n-space vertical>
+          <!-- Position Field and Search Period -->
+          <n-grid :cols="4" x-gap="12">
+            <n-form-itemGi :span="3" label="Должность (Искать в названии резюме по точной фразе за все время)">
+              <n-auto-complete
+                v-model:value="formModel.position"
+                :options="positionOptions"
+                placeholder="Например: Frontend-разработчик"
+                clearable
+                @update:value="handlePositionSearch"
+              />
+            </n-form-itemGi>
+            <n-form-itemGi :span="1" label="Период обновления">
+              <n-input-number
+                status="warning"
+                v-model:value="formModel.searchPeriod"
+                placeholder="Дней"
+                clearable
+                :min="1"
+                :max="365"
+              />
+            </n-form-itemGi>
+          </n-grid>
+
           <!-- Keywords / Text Queries -->
           <n-form-item label="Ключевые слова и параметры текстового поиска">
             <n-dynamic-input
@@ -252,7 +270,13 @@ const handleSearch = async () => {
               </template>
               <template #default="{ value }">
                 <n-space vertical style="width: 100%; border: 1px solid var(--n-border-color); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
-                  <n-input v-model:value="value.text" placeholder="Введите ключевые слова..." />
+                  <n-auto-complete
+                    v-model:value="value.text"
+                    placeholder="Введите ключевые слова..."
+                    :options="keywordOptions"
+                    clearable
+                    @update:value="handleKeywordSearch"
+                  />
                   <n-grid :cols="3" x-gap="12">
                     <n-form-itemGi label="Где искать?" :show-feedback="false">
                       <n-select v-model:value="value.field" :options="TEXT_QUERY_FIELDS" />
@@ -261,7 +285,7 @@ const handleSearch = async () => {
                       <n-select v-model:value="value.logic" :options="TEXT_QUERY_LOGIC" />
                     </n-form-itemGi>
                     <n-form-itemGi label="Период" :show-feedback="false">
-                      <n-select v-model:value="value.period" :options="TEXT_QUERY_PERIODS" />
+                      <n-select v-model:value="value.period" :options="TEXT_QUERY_PERIODS" :disabled="value.field === 'title'" />
                     </n-form-itemGi>
                   </n-grid>
                 </n-space>
@@ -284,7 +308,9 @@ const handleSearch = async () => {
               />
             </n-form-itemGi>
             <n-form-itemGi label="Метки">
-              <n-select v-model:value="formModel.labels" :options="RESUME_SEARCH_LABEL" multiple clearable placeholder="Например, только с фото" />
+              <n-select
+                status="warning"
+                v-model:value="formModel.labels" :options="RESUME_SEARCH_LABEL" multiple clearable placeholder="Например, только с фото" />
             </n-form-itemGi>
           </n-grid>
 
@@ -347,21 +373,21 @@ const handleSearch = async () => {
               </n-form-item>
 
               <!-- Relocation & Travel -->
-              <n-text depth="3" style="margin-bottom: 8px; display: block;">Местоположение и поездки</n-text>
+              <n-text depth="3" style="margin-bottom: 8px; display: block;">Местоположение и поездки (в разработке)</n-text>
               <n-grid :cols="2" x-gap="12">
                 <n-form-itemGi label="Переезд">
-                  <n-select v-model:value="formModel.relocation" :options="RESUME_SEARCH_RELOCATION" clearable />
+                  <n-select v-model:value="formModel.relocation" :options="RESUME_SEARCH_RELOCATION" clearable disabled />
                 </n-form-itemGi>
                 <n-form-itemGi label="Готовность к командировкам">
-                  <n-select v-model:value="formModel.businessTripReadiness" :options="BUSINESS_TRIP_READINESS" multiple clearable />
+                  <n-select v-model:value="formModel.businessTripReadiness" :options="BUSINESS_TRIP_READINESS" multiple clearable disabled />
                 </n-form-itemGi>
               </n-grid>
               <n-grid :cols="2" x-gap="12">
                 <n-form-itemGi label="Станции метро (ID)">
-                  <n-input v-model:value="formModel.metro" placeholder="ID через запятую..." />
+                  <n-input v-model:value="formModel.metro" placeholder="ID через запятую..." disabled />
                 </n-form-itemGi>
                 <n-form-itemGi label="Район">
-                  <n-input v-model:value="formModel.district" placeholder="Название или ID..." />
+                  <n-input v-model:value="formModel.district" placeholder="Название или ID..." disabled />
                 </n-form-itemGi>
               </n-grid>
 
@@ -382,8 +408,8 @@ const handleSearch = async () => {
                 </n-form-itemGi>
               </n-grid>
               
-              <n-form-item label="Ключевые навыки">
-                <n-select v-model:value="formModel.skills" multiple filterable tag clearable placeholder="Введите навык и нажмите Enter" />
+              <n-form-item label="Ключевые навыки (в разработке)">
+                <n-select v-model:value="formModel.skills" multiple filterable tag clearable placeholder="Введите навык и нажмите Enter" disabled />
               </n-form-item>
 
             </n-collapse-item>

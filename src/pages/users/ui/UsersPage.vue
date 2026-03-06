@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, h } from 'vue'
+import { ref, onMounted, h, computed } from 'vue'
 import { 
   NPageHeader, NCard, NDataTable, NButton, NSpace, NTag, NInput, NForm, NFormItem, 
-  NSelect, NModal, useMessage, NPopconfirm
+  NSelect, NModal, useMessage, NPopconfirm, NCheckbox, NDivider, NText
 } from 'naive-ui'
-import { userApi, type UserResponse, type UserCreateRequest, type UserUpdateRequest } from '@/shared/api'
+import { 
+  userApi, type UserResponse, type UserCreateRequest, type UserUpdateRequest, type UserTeamAssignment,
+  roleApi, type RoleResponse,
+  teamApi, type TeamResponse
+} from '@/shared/api'
 
 const message = useMessage()
 
-// Data fetching
+// ── Users ────────────────────────────────────────────────────────────────────
 const users = ref<UserResponse[]>([])
 const isLoading = ref(false)
 
@@ -24,30 +28,86 @@ const fetchUsers = async () => {
     }
 }
 
+// ── Roles ─────────────────────────────────────────────────────────────────────
+const roles = ref<RoleResponse[]>([])
+const rolesLoading = ref(false)
+
+const fetchRoles = async () => {
+    try {
+        rolesLoading.value = true
+        roles.value = await roleApi.getRoles()
+    } catch (e: any) {
+        message.error(`Ошибка загрузки ролей: ${e.message}`)
+    } finally {
+        rolesLoading.value = false
+    }
+}
+
+const roleOptions = computed(() =>
+    roles.value.map(r => ({ label: r.name, value: r.id }))
+)
+
+// ── Teams ─────────────────────────────────────────────────────────────────────
+const teams = ref<TeamResponse[]>([])
+const teamsLoading = ref(false)
+
+const fetchTeams = async () => {
+    try {
+        teamsLoading.value = true
+        teams.value = await teamApi.getTeams()
+    } catch (e: any) {
+        message.error(`Ошибка загрузки команд: ${e.message}`)
+    } finally {
+        teamsLoading.value = false
+    }
+}
+
 onMounted(() => {
     fetchUsers()
+    fetchRoles()
+    fetchTeams()
 })
 
+// ── Table columns ──────────────────────────────────────────────────────────────
 const columns = [
-  { title: 'ID', key: 'id', ellipsis: { tooltip: true } },
   { title: 'Email', key: 'email' },
-  { title: 'Имя', key: 'first_name' },
-  { title: 'Фамилия', key: 'last_name' },
+  { title: 'Имя', key: 'first_name', render: (row: UserResponse) => row.first_name || '—' },
+  { title: 'Фамилия', key: 'last_name', render: (row: UserResponse) => row.last_name || '—' },
   { 
     title: 'Роль', 
     key: 'role.name',
+    render(row: UserResponse) { return row.role?.name || 'Нет роли' }
+  },
+  {
+    title: 'Команды',
+    key: 'teams',
     render(row: UserResponse) {
-        return row.role?.name || 'Нет роли'
+        if (!row.teams?.length) return '—'
+        return h(NSpace, { size: 4 }, {
+            default: () => row.teams.map(t =>
+                h(NTag, { size: 'small', bordered: false }, { default: () => t.name })
+            )
+        })
     }
   },
   {
     title: 'Статус',
     key: 'status',
     render(row: UserResponse) {
+        const typeMap: Record<string, 'success' | 'default' | 'error'> = {
+            active: 'success',
+            inactive: 'default',
+            blocked: 'error',
+        }
+        const labelMap: Record<string, string> = {
+            active: 'Активен',
+            inactive: 'Неактивен',
+            blocked: 'Заблокирован',
+        }
         return h(
             NTag,
-            { type: row.status === 'active' ? 'success' : 'default', bordered: false },
-            { default: () => row.status === 'active' ? 'Активен' : row.status }
+            { type: typeMap[row.status] ?? 'default', bordered: false },
+            { default: () => labelMap[row.status] ?? row.status }
         )
     }
   },
@@ -82,52 +142,78 @@ const columns = [
   }
 ]
 
-// Form handling
+// ── Form state ─────────────────────────────────────────────────────────────────
 const showModal = ref(false)
 const isSubmitting = ref(false)
 const isEditing = ref(false)
 const currentUserId = ref<string | null>(null)
 
-const formModel = ref<{
-    email: string;
-    password?: string;
-    first_name: string;
-    last_name: string;
-    role_id: string;
-    status: string;
-    team_ids: string[];
-}>({
+interface FormModel {
+    email: string
+    password: string
+    first_name: string
+    last_name: string
+    role_id: string
+    status: string
+    /** team_assignments — приоритетный способ (приоритет над team_ids) */
+    team_assignments: UserTeamAssignment[]
+}
+
+const defaultForm = (): FormModel => ({
     email: '',
     password: '',
     first_name: '',
     last_name: '',
     role_id: '',
     status: 'active',
-    team_ids: []
+    team_assignments: [],
 })
 
-// TODO: In a real app we would load roles and teams from the API
-const mockRoleOptions = [
-    { label: 'Admin', value: '550e8400-e29b-41d4-a716-446655440000' },
-    { label: 'Manager', value: '497f6eca-6276-4993-bfeb-53cbbbba6f08' },
-    { label: 'User', value: '3b09087c-6500-4b2e-a5ac-6ba52f75a6be' }
-]
+const formModel = ref<FormModel>(defaultForm())
 
 const statusOptions = [
     { label: 'Активен', value: 'active' },
-    { label: 'Неактивен', value: 'inactive' }
+    { label: 'Неактивен', value: 'inactive' },
+    { label: 'Заблокирован', value: 'blocked' },
 ]
 
-const resetForm = () => {
-    formModel.value = {
-        email: '',
-        password: '',
-        first_name: '',
-        last_name: '',
-        role_id: '',
-        status: 'active',
-        team_ids: []
+// ── Team assignment helpers ────────────────────────────────────────────────────
+const teamOptions = computed(() =>
+    teams.value.map(t => ({ label: t.name, value: t.id }))
+)
+
+/** IDs команд, выбранных в team_assignments */
+const selectedTeamIds = computed(() =>
+    formModel.value.team_assignments.map(a => a.team_id)
+)
+
+const onTeamsChange = (ids: string[]) => {
+    // добавляем новые
+    for (const id of ids) {
+        if (!selectedTeamIds.value.includes(id)) {
+            formModel.value.team_assignments.push({ team_id: id, is_manager: false })
+        }
     }
+    // удаляем снятые
+    formModel.value.team_assignments = formModel.value.team_assignments.filter(
+        a => ids.includes(a.team_id)
+    )
+}
+
+const setManager = (teamId: string, isManager: boolean) => {
+    const assignment = formModel.value.team_assignments.find(a => a.team_id === teamId)
+    if (assignment) assignment.is_manager = isManager
+}
+
+const getAssignment = (teamId: string): UserTeamAssignment | undefined =>
+    formModel.value.team_assignments.find(a => a.team_id === teamId)
+
+const teamNameById = (id: string) =>
+    teams.value.find(t => t.id === id)?.name ?? id
+
+// ── CRUD handlers ──────────────────────────────────────────────────────────────
+const resetForm = () => {
+    formModel.value = defaultForm()
     currentUserId.value = null
     isEditing.value = false
 }
@@ -144,7 +230,6 @@ const handleDelete = async (user: UserResponse) => {
 
 const openCreateModal = () => {
     resetForm()
-    isEditing.value = false
     showModal.value = true
 }
 
@@ -154,11 +239,15 @@ const openEditModal = (user: UserResponse) => {
     currentUserId.value = user.id
     formModel.value = {
         email: user.email,
+        password: '',
         first_name: user.first_name || '',
         last_name: user.last_name || '',
         role_id: user.role?.id || '',
         status: user.status || 'active',
-        team_ids: [] // We might extract this from user.team_assignments if available
+        team_assignments: (user.teams ?? []).map(t => ({
+            team_id: t.id,
+            is_manager: (t as any).is_manager ?? false,
+        })),
     }
     showModal.value = true
 }
@@ -169,11 +258,12 @@ const handleSubmit = async () => {
         if (isEditing.value && currentUserId.value) {
             const updatePayload: UserUpdateRequest = {
                 email: formModel.value.email,
-                first_name: formModel.value.first_name,
-                last_name: formModel.value.last_name,
+                first_name: formModel.value.first_name || undefined,
+                last_name: formModel.value.last_name || undefined,
                 role_id: formModel.value.role_id,
                 status: formModel.value.status,
-                team_ids: formModel.value.team_ids,
+                team_ids: formModel.value.team_assignments.map(a => a.team_id),
+                team_assignments: formModel.value.team_assignments,
             }
             await userApi.updateUser(currentUserId.value, updatePayload)
             message.success('Пользователь обновлен')
@@ -181,16 +271,17 @@ const handleSubmit = async () => {
             const createPayload: UserCreateRequest = {
                 email: formModel.value.email,
                 password: formModel.value.password,
-                first_name: formModel.value.first_name,
-                last_name: formModel.value.last_name,
+                first_name: formModel.value.first_name || undefined,
+                last_name: formModel.value.last_name || undefined,
                 role_id: formModel.value.role_id,
-                team_ids: formModel.value.team_ids,
+                team_ids: formModel.value.team_assignments.map(a => a.team_id),
+                team_assignments: formModel.value.team_assignments,
             }
             await userApi.createUser(createPayload)
             message.success('Пользователь создан')
         }
         showModal.value = false
-        fetchUsers() // Refresh list
+        fetchUsers()
     } catch (e: any) {
         message.error(`Ошибка сохранения: ${e.message}`)
     } finally {
@@ -219,40 +310,97 @@ const handleSubmit = async () => {
       />
     </n-card>
 
-    <n-modal v-model:show="showModal" :title="isEditing ? 'Редактировать пользователя' : 'Создать пользователя'" preset="card" style="width: 500px">
+    <!-- ── Create / Edit Modal ──────────────────────────────────────────── -->
+    <n-modal
+      v-model:show="showModal"
+      :title="isEditing ? 'Редактировать пользователя' : 'Создать пользователя'"
+      preset="card"
+      style="width: 560px"
+    >
       <n-form :model="formModel" @submit.prevent="handleSubmit">
-        <n-form-item label="Email" path="email">
-          <n-input v-model:value="formModel.email" placeholder="example@mail.com" />
+
+        <!-- Email -->
+        <n-form-item label="Email" path="email" required>
+          <n-input v-model:value="formModel.email" placeholder="user@example.com" />
         </n-form-item>
 
-        <n-form-item v-if="!isEditing" label="Пароль" path="password">
-          <n-input type="password" v-model:value="formModel.password" placeholder="Введите пароль" show-password-on="click" />
+        <!-- Password (только при создании) -->
+        <n-form-item v-if="!isEditing" label="Пароль" path="password" required>
+          <n-input
+            type="password"
+            v-model:value="formModel.password"
+            placeholder="Не менее 8 символов"
+            show-password-on="click"
+          />
         </n-form-item>
 
+        <!-- Имя / Фамилия -->
         <n-space item-style="width: calc(50% - 6px);">
-            <n-form-item label="Имя" path="first_name">
-               <n-input v-model:value="formModel.first_name" placeholder="Иван" />
-            </n-form-item>
-            <n-form-item label="Фамилия" path="last_name">
-               <n-input v-model:value="formModel.last_name" placeholder="Иванов" />
-            </n-form-item>
+          <n-form-item label="Имя" path="first_name">
+            <n-input v-model:value="formModel.first_name" placeholder="Иван" />
+          </n-form-item>
+          <n-form-item label="Фамилия" path="last_name">
+            <n-input v-model:value="formModel.last_name" placeholder="Иванов" />
+          </n-form-item>
         </n-space>
 
-        <n-form-item label="Роль" path="role_id">
-          <!-- TODO: Load roles dynamically instead of using mockOptions if required -->
-          <n-select v-model:value="formModel.role_id" :options="mockRoleOptions" placeholder="Выберите роль" />
+        <!-- Роль -->
+        <n-form-item label="Роль" path="role_id" required>
+          <n-select
+            v-model:value="formModel.role_id"
+            :options="roleOptions"
+            :loading="rolesLoading"
+            placeholder="Выберите роль"
+          />
         </n-form-item>
-        
+
+        <!-- Статус (только при редактировании) -->
         <n-form-item v-if="isEditing" label="Статус" path="status">
           <n-select v-model:value="formModel.status" :options="statusOptions" />
         </n-form-item>
 
-        <n-space justify="end" style="margin-top: 24px;">
+        <!-- Назначение в команды -->
+        <n-divider style="margin: 12px 0;" />
+
+        <!-- Выпадающий список команд (мультиселект) -->
+        <n-form-item label="Команды" path="team_assignments">
+          <n-select
+            :value="selectedTeamIds"
+            @update:value="onTeamsChange"
+            :options="teamOptions"
+            :loading="teamsLoading"
+            multiple
+            clearable
+            placeholder="Выберите команды"
+          />
+        </n-form-item>
+
+        <!-- Флаги «Менеджер» для каждой выбранной команды -->
+        <template v-if="selectedTeamIds.length">
+          <n-form-item
+            v-for="teamId in selectedTeamIds"
+            :key="teamId"
+            :label="teamNameById(teamId)"
+            label-placement="left"
+            style="margin-bottom: 4px;"
+          >
+            <n-checkbox
+              :checked="getAssignment(teamId)?.is_manager ?? false"
+              @update:checked="v => setManager(teamId, v)"
+            >
+              <n-text depth="3" style="font-size: 12px;">Менеджер команды</n-text>
+            </n-checkbox>
+          </n-form-item>
+        </template>
+
+        <!-- Кнопки -->
+        <n-space justify="end" style="margin-top: 16px;">
           <n-button @click="showModal = false">Отмена</n-button>
           <n-button type="primary" attr-type="submit" :loading="isSubmitting">
             Сохранить
           </n-button>
         </n-space>
+
       </n-form>
     </n-modal>
   </div>

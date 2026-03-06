@@ -2,13 +2,14 @@
 import { h, onMounted, ref } from 'vue';
 import { NDataTable, NButton, NSpace, NText, NPopconfirm, useMessage, type DataTableColumns } from 'naive-ui';
 import { useTeamStore, teamApi, type TeamResponse } from '@/entities/team';
-import { TeamModal, TeamMembersModal } from '@/features/team-management';
+import { TeamModal, TeamMembersModal, TeamPermissionsModal } from '@/features/team-management';
 
 const store = useTeamStore();
 const message = useMessage();
 
 const showModal = ref(false);
 const showMembersModal = ref(false);
+const showPermissionsModal = ref(false);
 const editingTeam = ref<TeamResponse | undefined>(undefined);
 const selectedTeam = ref<TeamResponse | undefined>(undefined);
 
@@ -39,6 +40,11 @@ const handleDeleteTeam = async (teamId: string) => {
 const handleOpenMembers = (team: TeamResponse) => {
     selectedTeam.value = team;
     showMembersModal.value = true;
+};
+
+const handleOpenPermissions = (team: TeamResponse) => {
+    selectedTeam.value = team;
+    showPermissionsModal.value = true;
 };
 
 const columns: DataTableColumns<TeamResponse> = [
@@ -75,6 +81,11 @@ const columns: DataTableColumns<TeamResponse> = [
                             type: 'info',
                             onClick: () => handleOpenMembers(row)
                         }, { default: () => 'Участники' }),
+                        h(NButton, {
+                            size: 'small',
+                            type: 'warning',
+                            onClick: () => handleOpenPermissions(row)
+                        }, { default: () => 'Права' }),
                         h(NButton, {
                             size: 'small',
                             onClick: () => handleEditTeam(row)
@@ -120,6 +131,11 @@ const columns: DataTableColumns<TeamResponse> = [
     
     <TeamMembersModal
       v-model:show="showMembersModal"
+      :team="selectedTeam"
+    />
+    
+    <TeamPermissionsModal
+      v-model:show="showPermissionsModal"
       :team="selectedTeam"
     />
   </n-space>

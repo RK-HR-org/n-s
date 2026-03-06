@@ -144,3 +144,40 @@ export const DRIVER_LICENSE_TYPES: Option[] = [
   { value: "TM", label: "TM" },
   { value: "TB", label: "TB" },
 ];
+
+/** Новые форматы работы (work_format). */
+export const VACANCY_WORK_FORMAT: Option[] = [
+  { value: "remote", label: "Удаленная работа" },
+  { value: "office", label: "Офис" },
+  { value: "hybrid", label: "Гибрид" },
+];
+
+/** Новые типы занятости (vacancy_search_employment_form). */
+export const VACANCY_EMPLOYMENT_FORM: Option[] = [
+  { value: "full", label: "Полная занятость" },
+  { value: "part", label: "Частичная занятость" },
+  { value: "probation", label: "Стажировка" },
+];
+
+/** Новые графики работы (work_schedule_by_days). */
+export const VACANCY_WORK_SCHEDULE: Option[] = [
+  { value: "fullDay", label: "Полный день" },
+  { value: "shift", label: "Сменный график" },
+  { value: "flexible", label: "Гибкий график" },
+  { value: "flyInFlyOut", label: "Вахтовый метод" },
+];
+
+/** Рабочие часы / подработка (working_hours). */
+export const VACANCY_WORKING_HOURS: Option[] = [
+  { value: "from_four_to_six_hours_in_a_day", label: "От 4 часов в день" },
+  { value: "part_time_evenings", label: "По вечерам" },
+  { value: "part_time_weekends", label: "По выходным" },
+];
+
+/** Метки вакансий (vacancy_label). */
+export const VACANCY_LABEL: Option[] = [
+  { value: "with_salary", label: "С указанием зарплаты" },
+  { value: "accessible_for_kids", label: "Доступно от 14 лет" },
+  { value: "accessible_for_disabled", label: "Доступно людям с инвалидностью" },
+  { value: "not_from_agency", label: "Без вакансий от кадровых агентств" },
+];

@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { NLayout, NLayoutContent, NText, NH2, NSpace, NGrid, NGridItem, NCard, NTag, NAlert } from 'naive-ui'
-import { HHSearchForm, ResumeList, useSearchStore } from '@/features/hh-search'
+import { VacancySearchForm, VacancyTable, useVacancySearchStore } from '@/features/vacancy-search'
 
-const searchStore = useSearchStore()
+const searchStore = useVacancySearchStore()
 const currentPage = ref(1)
 
 const handlePageUpdate = (page: number) => {
   currentPage.value = page
   if (searchStore.currentSessionId) {
-    // Pagination offset calculation: (page - 1) * perPage
     const perPage = 20
     searchStore.loadSessionItems(searchStore.currentSessionId, perPage, (page - 1) * perPage)
   }
@@ -17,7 +16,7 @@ const handlePageUpdate = (page: number) => {
 
 import { computed } from 'vue'
 import {
-  EDUCATION_LEVEL, EXPERIENCE, EMPLOYMENT, SCHEDULE, GENDER
+  EXPERIENCE, EMPLOYMENT, SCHEDULE, VACANCY_SEARCH_ORDER, CURRENCY_OPTIONS
 } from '@/shared/constants/hhDictionaries'
 import { useDictionaryStore } from '@/entities/dictionary'
 
@@ -70,12 +69,6 @@ const formattedFilters = computed(() => {
         items.push({ label: 'Зарплата', tags: [`${from} ${to} ${f.currency || ''}`.trim()] })
     }
 
-    // Demography
-    if (f.ageFrom || f.ageTo) {
-        items.push({ label: 'Возраст', tags: [`${f.ageFrom ? 'от ' + f.ageFrom : ''} ${f.ageTo ? 'до ' + f.ageTo : ''}`.trim()] })
-    }
-    if (f.gender) items.push({ label: 'Пол', tags: [GENDER.find(g => g.value === f.gender)?.label || f.gender] })
-
     // Experience & Employment
     const expTags = getDictTags(f.experience, EXPERIENCE)
     if (expTags.length) items.push({ label: 'Опыт работы', tags: expTags })
@@ -86,8 +79,14 @@ const formattedFilters = computed(() => {
     const schedTags = getDictTags(f.schedule, SCHEDULE)
     if (schedTags.length) items.push({ label: 'График', tags: schedTags })
 
-    // Labels
-    if (f.labels && f.labels.length) items.push({ label: 'Метки', tags: f.labels })
+    // Employer IDs
+    if (f.employerIds && f.employerIds.length) items.push({ label: 'Работодатели', tags: f.employerIds })
+
+    // Search Field
+    if (f.searchField && f.searchField.length) {
+        const fieldLabels: Record<string, string> = { name: 'Название', company_name: 'Компания', description: 'Описание' }
+        items.push({ label: 'Области поиска', tags: f.searchField.map((s: string) => fieldLabels[s] || s) })
+    }
 
     // Skills
     if (f.skills && f.skills.length) items.push({ label: 'Навыки', tags: f.skills })
@@ -100,12 +99,12 @@ const formattedFilters = computed(() => {
   <n-layout>
     <n-layout-content style="padding: 24px;">
       <n-space vertical size="large">
-        <n-h2>Поиск резюме</n-h2>
+        <n-h2>Поиск вакансий</n-h2>
         
         <n-grid :cols="4" x-gap="24">
           <!-- Left side: Search Form -->
           <n-grid-item :span="2">
-            <HHSearchForm />
+            <VacancySearchForm />
           </n-grid-item>
 
           <!-- Right side: Results -->
@@ -113,11 +112,11 @@ const formattedFilters = computed(() => {
             <template v-if="!searchStore.currentSessionId && !searchStore.isLoading">
               <n-card bordered :content-style="{ padding: '16px', minHeight: '500px' }">
                 <div v-if="formattedFilters.length === 0" style="color: var(--n-text-color-3);">
-                  Заполните критерии поиска и нажмите "Найти", чтобы увидеть результаты.
+                  Заполните критерии поиска и нажмите "Найти вакансии", чтобы увидеть результаты.
                 </div>
                 <div v-else>
                     <n-alert v-if="!searchStore.draftFilters?.searchPeriod" type="warning" show-icon style="margin-bottom: 16px;">
-                        Если не выбрать период обновления, то будут найдены нерелевантные устаревшие резюме.
+                        Если не выбрать период публикации, то будут найдены нерелевантные устаревшие вакансии.
                     </n-alert>
                     <n-text strong style="display: block; margin-bottom: 12px;">Выбранные фильтры:</n-text>
                     <n-space vertical :size="10">
@@ -134,8 +133,8 @@ const formattedFilters = computed(() => {
               </n-card>
             </template>
             <template v-else>
-              <ResumeList 
-                :resumes="searchStore.searchResults"
+              <VacancyTable 
+                :vacancies="searchStore.searchResults"
                 :is-loading="searchStore.isLoading"
                 :total="searchStore.totalResults"
                 :page="currentPage"

@@ -11,6 +11,43 @@ export const useSearchStore = defineStore('hh-search', () => {
     const searchResults = ref<any[]>([])
     const totalResults = ref(0)
 
+    // Draft filters for the search form
+    const draftFilters = ref<any>({
+        position: '',
+        searchPeriod: null,
+        textQueries: [{ text: '', logic: 'all', field: 'everywhere', period: 'all_time' }],
+        ageFrom: null,
+        ageTo: null,
+        gender: null,
+        labels: null,
+        areas: null,
+        relocation: null,
+        metro: null,
+        district: null,
+        citizenship: null,
+        workTicket: null,
+        businessTripReadiness: null,
+        period: null,
+        dateFrom: null,
+        dateTo: null,
+        educationLevels: null,
+        educationalInstitution: null,
+        experience: null,
+        filterExpIndustry: null,
+        filterExpPeriod: null,
+        employment: null,
+        schedule: null,
+        skills: null,
+        languages: null,
+        driverLicenseTypes: null,
+        salaryFrom: null,
+        salaryTo: null,
+        currency: 'RUR',
+        professionalRole: null,
+        jobSearchStatus: null,
+        orderBy: 'relevance'
+    })
+
     // Helper to get active team ID
     const getActiveTeamId = () => {
         const userStore = useUserStore()
@@ -117,10 +154,10 @@ export const useSearchStore = defineStore('hh-search', () => {
     const currentSessionMetadata = ref<any>(null)
 
     // Fetch user sessions
-    const fetchSessions = async (limit = 20, offset = 0, passedTeamId?: string) => {
+    const fetchSessions = async (limit = 20, offset = 0, scope: 'mine' | 'team' = 'mine', passedTeamId?: string) => {
         isSessionsLoading.value = true
         try {
-            const teamId = passedTeamId || getActiveTeamId()
+            const teamId = scope === 'team' ? (passedTeamId || getActiveTeamId()) : undefined
             const response = await searchApi.getSessions(limit, offset, teamId)
 
             sessions.value = response.items || []
@@ -154,6 +191,7 @@ export const useSearchStore = defineStore('hh-search', () => {
         currentSessionMetadata,
         searchResults,
         totalResults,
+        draftFilters,
         sessions,
         isSessionsLoading,
         totalSessions,

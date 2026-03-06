@@ -1,5 +1,5 @@
 import { apiClient, API_URL } from '@/shared/api/base';
-import type { TeamResponse, TeamCreateUpdate, TeamMembersResponse } from '../model/types';
+import type { TeamResponse, TeamCreateUpdate, TeamMembersResponse, TeamPermissionsListResponse, PermissionType, TeamPermissionResponse } from '../model/types';
 
 export const teamApi = {
     getTeams: () => apiClient<TeamResponse[]>('/v1/team'),
@@ -7,6 +7,19 @@ export const teamApi = {
     getTeamById: (teamId: string) => apiClient<TeamResponse>(`/v1/team/${teamId}`),
 
     getTeamMembers: (teamId: string) => apiClient<TeamMembersResponse>(`/v1/team/${teamId}/members`),
+
+    getTeamPermissions: (teamId: string) => apiClient<TeamPermissionsListResponse>(`/v1/team/${teamId}/permission`),
+
+    addTeamPermission: (teamId: string, permissionType: PermissionType) =>
+        apiClient<TeamPermissionResponse>(`/v1/team/${teamId}/permission`, {
+            method: 'POST',
+            body: JSON.stringify({ permission_type: permissionType }),
+        }),
+
+    removeTeamPermission: (teamId: string, permissionType: PermissionType) =>
+        apiClient<void>(`/v1/team/${teamId}/permission/${permissionType}`, {
+            method: 'DELETE',
+        }),
 
     createTeam: (data: TeamCreateUpdate) =>
         apiClient<TeamResponse>('/v1/team', {

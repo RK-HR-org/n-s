@@ -25,3 +25,27 @@ export interface TeamMembersResponse {
     team_name: string;
     members: TeamMemberInfo[];
 }
+
+export type PermissionType =
+    | 'add_users'
+    | 'edit_users'
+    | 'delete_users'
+    | 'view_users_list'
+    | 'view_user_details'
+    | 'view_teams_list'
+    | 'view_team_details'
+    | 'execute_hh_search'
+    | 'manage_team_permissions'
+    | 'manage_team_quotas';
+
+export interface TeamPermissionResponse {
+    id: string;
+    permission_type: PermissionType;
+    created_at: string;
+}
+
+export interface TeamPermissionsListResponse {
+    team_id: string;
+    team_name: string;
+    permissions: TeamPermissionResponse[];
+}

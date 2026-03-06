@@ -51,8 +51,8 @@ const handleLogin = async (e: Event) => {
 </script>
 
 <template>
-  <div style="max-width: 400px; margin: 0 auto;">
-    <n-alert v-if="errorMsg" type="error" style="margin-bottom: 24px;">
+  <div>
+    <n-alert v-if="errorMsg" type="error" style="margin-bottom: 24px; border-radius: 8px;">
       {{ errorMsg }}
     </n-alert>
     
@@ -61,10 +61,11 @@ const handleLogin = async (e: Event) => {
       :model="formValue"
       :rules="rules"
       size="large"
+      :show-require-mark="false"
       @submit="handleLogin"
     >
       <n-form-item path="email" label="Email">
-        <n-input v-model:value="formValue.email" placeholder="example@email.com" />
+        <n-input v-model:value="formValue.email" placeholder="example@email.com" style="border-radius: 8px;" />
       </n-form-item>
       
       <n-form-item path="password" label="Пароль">
@@ -73,19 +74,22 @@ const handleLogin = async (e: Event) => {
           type="password" 
           show-password-on="click" 
           placeholder="Ваш пароль" 
+          style="border-radius: 8px;"
         />
       </n-form-item>
       
-      <n-space justify="end" style="margin-top: 24px;">
+      <div style="margin-top: 24px;">
         <n-button 
           attr-type="submit" 
           type="primary" 
           :loading="loading" 
           block
+          size="large"
+          style="border-radius: 8px; font-weight: 500;"
         >
           Войти
         </n-button>
-      </n-space>
+      </div>
     </n-form>
   </div>
 </template>

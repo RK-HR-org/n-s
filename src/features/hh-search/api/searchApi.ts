@@ -3,7 +3,12 @@ import { apiClient } from '@/shared/api/base'
 export interface TextQueryDTO {
     text: string
     logic?: 'all' | 'any' | 'phrase' | 'except'
-    field?: 'everywhere' | 'title' | 'education' | 'experience' | 'experience_company' | 'experience_position' | 'experience_description' | 'skills'
+    field?: (
+        // Resume fields
+        'everywhere' | 'title' | 'education' | 'experience' | 'experience_company' | 'experience_position' | 'experience_description' | 'skills'
+        // Vacancy fields
+        | 'name' | 'company_name' | 'description'
+    )
     period?: 'all_time' | 'last_year' | 'last_three_years' | 'last_six_years'
 }
 
@@ -99,10 +104,10 @@ export const searchApi = {
         const params = new URLSearchParams()
         params.append('limit', limit.toString())
         params.append('offset', offset.toString())
-        if (teamId) {
-            params.append('team_id', teamId)
-        }
-        return apiClient<any>(`/v1/search/sessions?${params.toString()}`, {
+
+        const path = teamId ? `/v1/search/teams/${teamId}/sessions` : `/v1/search/sessions`
+
+        return apiClient<any>(`${path}?${params.toString()}`, {
             method: 'GET'
         })
     }
