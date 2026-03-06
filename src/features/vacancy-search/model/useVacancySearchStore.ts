@@ -16,7 +16,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
     const draftFilters = ref<any>({
         position: '',
         searchPeriod: null,
-        textQueries: [{ text: '', logic: 'all', field: 'name', period: 'all_time' }],
+        textQueries: [{ text: '', logic: 'all', field: 'everywhere', period: 'all_time' }],
         areas: null,
         metro: null,
         period: null,
@@ -30,8 +30,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
         workingHours: null,
         vacancyLabels: null,
         driverLicenseTypes: null,
-        salaryFrom: null,
-        salaryTo: null,
+        salary: null,
         currency: 'RUR',
         professionalRole: null,
         // Vacancy-specific

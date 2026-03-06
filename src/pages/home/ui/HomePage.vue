@@ -33,7 +33,7 @@ const router = useRouter()
 
           <n-alert title="Приложение в разработке" type="info" style="margin-bottom: 24px; text-align: left; border-radius: 8px;">
             В данный момент платформа находится на стадии активной разработки. Некоторые функции могут работать не в полном объеме или находиться в процессе доработки. 
-            Команда разработки будет очень признательна за любую обратную связь и сообщения о найденных ошибках. <br>Связаться с разработчиком можно по ссылке <a href="https://xlnk.ms/open/profile/36ef1529-d614-51da-8587-9b9b2d047c52" target="_blank" rel="noopener noreferrer" style="color: var(--n-text-color);">Опарин Сергей в Express</a>
+            Команда разработки будет очень признательна за любую обратную связь и сообщения о найденных ошибках. <br>Обращайтесь в Центр IT HR к руководителю <a href="https://xlnk.ms/open/profile/4ccf716d-19a9-5c0d-b833-f95fc22d132b" target="_blank" rel="noopener noreferrer" style="color: var(--n-text-color);">Мосину Михаилу</a> или Менеджеру проектов - <a href="https://xlnk.ms/open/profile/36ef1529-d614-51da-8587-9b9b2d047c52" target="_blank" rel="noopener noreferrer" style="color: var(--n-text-color);">Опарину Сергею</a>
           </n-alert>
 
           <div style="text-align: left; margin-bottom: 32px;">
