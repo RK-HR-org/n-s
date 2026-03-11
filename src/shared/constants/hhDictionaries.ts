@@ -145,39 +145,45 @@ export const DRIVER_LICENSE_TYPES: Option[] = [
   { value: "TB", label: "TB" },
 ];
 
-/** Новые форматы работы (work_format). */
+/** Новые форматы работы (work_format, вакансии). */
 export const VACANCY_WORK_FORMAT: Option[] = [
-  { value: "remote", label: "Удаленная работа" },
-  { value: "office", label: "Офис" },
-  { value: "hybrid", label: "Гибрид" },
+  { value: "ON_SITE", label: "На месте работодателя" },
+  { value: "REMOTE", label: "Из дома" },
+  { value: "HYBRID", label: "Гибрид" },
+  { value: "FIELD_WORK", label: "Разъездная" },
 ];
 
 /** Новые типы занятости (vacancy_search_employment_form). */
 export const VACANCY_EMPLOYMENT_FORM: Option[] = [
-  { value: "full", label: "Полная занятость" },
-  { value: "part", label: "Частичная занятость" },
-  { value: "probation", label: "Стажировка" },
+  { value: "FULL", label: "Полная занятость" },
+  { value: "PART", label: "Частичная занятость" },
+  { value: "PROJECT", label: "Проект" },
+  { value: "FLY_IN_FLY_OUT", label: "Вахта" },
+  { value: "SIDE_JOB", label: "Подработка" },
 ];
 
 /** Новые графики работы (work_schedule_by_days). */
 export const VACANCY_WORK_SCHEDULE: Option[] = [
-  { value: "fullDay", label: "Полный день" },
-  { value: "shift", label: "Сменный график" },
-  { value: "flexible", label: "Гибкий график" },
-  { value: "flyInFlyOut", label: "Вахтовый метод" },
+  { value: "SEVEN_ON_ZERO_OFF", label: "7/0" },
+  { value: "FIVE_ON_TWO_OFF", label: "5/2" },
 ];
 
 /** Рабочие часы / подработка (working_hours). */
 export const VACANCY_WORKING_HOURS: Option[] = [
-  { value: "from_four_to_six_hours_in_a_day", label: "От 4 часов в день" },
-  { value: "part_time_evenings", label: "По вечерам" },
-  { value: "part_time_weekends", label: "По выходным" },
+  { value: "HOURS_2", label: "2 часа" },
+  { value: "HOURS_4", label: "4 часа" },
 ];
 
 /** Метки вакансий (vacancy_label). */
 export const VACANCY_LABEL: Option[] = [
+  { value: "with_address", label: "Только с адресом" },
+  { value: "accept_handicapped", label: "Только доступные для людей с инвалидностью" },
+  { value: "not_from_agency", label: "Без вакансий агентств" },
+  { value: "accept_kids", label: "Только доступные для соискателей от 14 лет" },
+  { value: "accredited_it", label: "Только аккредитованные ИТ-компании" },
+  { value: "low_performance", label: "Только вакансии, у которых меньше 10 откликов" },
+  { value: "internship", label: "Только стажировки" },
+  { value: "accept_teens", label: "Только доступные для соискателей от 16 лет" },
+  // Дополнительная удобная метка для фильтра "только с зарплатой"
   { value: "with_salary", label: "С указанием зарплаты" },
-  { value: "accessible_for_kids", label: "Доступно от 14 лет" },
-  { value: "accessible_for_disabled", label: "Доступно людям с инвалидностью" },
-  { value: "not_from_agency", label: "Без вакансий от кадровых агентств" },
 ];

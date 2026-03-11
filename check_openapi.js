@@ -1,0 +1,1 @@
+const fs=require('fs'); const data = JSON.parse(fs.readFileSync('.agents/skills/backend-api-expert/references/openapi.json', 'utf8')); console.log(Object.keys(data.components.schemas.AdvancedSearchFiltersDTO.properties).join(', '));

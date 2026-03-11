@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NPagination, NEmpty, NSpace, NSkeleton, NCard } from 'naive-ui'
+import { NPagination, NEmpty, NSpace, NSkeleton, NCard, NText, NAlert } from 'naive-ui'
 import ResumeCard from './ResumeCard.vue'
 
 const props = defineProps<{
@@ -37,6 +37,16 @@ const emit = defineEmits<{
 
     <!-- Results -->
     <template v-else>
+      <div style="margin-bottom: 24px;">
+        <n-space justify="space-between" align="center" style="margin-bottom: 16px;">
+          <n-text strong style="font-size: 18px;">Найдено резюме: {{ total.toLocaleString('ru-RU') }}</n-text>
+        </n-space>
+        
+        <n-alert v-if="total > 100" type="warning" show-icon style="margin-bottom: 16px;">
+          Найдено более 100 результатов. Возможно, ваши фильтры слишком общие. Рекомендуется уточнить запрос для более точной выдачи.
+        </n-alert>
+      </div>
+
       <div style="margin-bottom: 16px;">
         <ResumeCard 
           v-for="resume in resumes" 

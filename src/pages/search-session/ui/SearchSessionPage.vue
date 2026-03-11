@@ -37,7 +37,7 @@ onMounted(async () => {
 const handlePageUpdate = (page: number) => {
     currentPage.value = page
     const perPage = 20
-    searchStore.loadSessionItems(sessionId, perPage, (page - 1) * perPage)
+    searchStore.fetchSessionHistoryItems(sessionId, perPage, (page - 1) * perPage)
 }
 
 const handleTableSort = (sorter: any) => {
@@ -287,7 +287,6 @@ const exportToExcel = () => {
                                 <n-text depth="3" v-else>Нет фильтров</n-text>
                             </n-space>
                         </div>
-
                         <!-- <n-collapse style="margin-top: 16px;">
                             <n-collapse-item title="Сырые данные (JSON)" name="filters">
                                 <pre style="background-color: var(--n-color-modal); padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 13px;">{{ JSON.stringify(searchStore.currentSessionMetadata.query_raw || searchStore.currentSessionMetadata.filters, null, 2) }}</pre>

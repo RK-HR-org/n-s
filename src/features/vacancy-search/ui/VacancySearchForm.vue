@@ -10,6 +10,7 @@ import {
   DRIVER_LICENSE_TYPES, EDUCATION_LEVEL
 } from '@/shared/constants/hhDictionaries'
 import SparklesIcon from '@/shared/ui/icons/SparklesIcon.vue'
+import InfoIcon from '@/shared/ui/icons/InfoIcon.vue'
 import { useVacancySearchStore } from '../model/useVacancySearchStore'
 import { useUserStore } from '@/entities/user'
 import { staticApi } from '@/shared/api'
@@ -24,6 +25,17 @@ const selectedTeamId = ref(userStore.user?.teams?.[0]?.id || userStore.user?.tea
 const positivePrompt = ref('')
 const negativePrompt = ref('')
 const searchStore = useVacancySearchStore()
+
+import LogicTreeIcon from '@/shared/ui/icons/LogicTreeIcon.vue'
+import { HHQueryBuilderModal } from '@/features/hh-query-builder'
+
+const showQueryBuilder = ref(false)
+
+const handleQuerySubmit = (query: string) => {
+  if (formModel.value) {
+    formModel.value.text = query
+  }
+}
 
 const handleEnrich = async () => {
   if (!positivePrompt.value && !negativePrompt.value) return
@@ -44,7 +56,7 @@ const handleEnrich = async () => {
 
 // Dictionary store
 const dictStore = useDictionaryStore()
-const { areas, professionalRoles, isLoading } = storeToRefs(dictStore)
+const { areas, professionalRoles, industries, isLoading } = storeToRefs(dictStore)
 
 onMounted(() => {
   dictStore.fetchAll()
@@ -68,31 +80,15 @@ const roleOptions = computed(() => {
   }))
 })
 
+const industryOptions = computed(() => {
+  return industries.value.map(ind => ({
+    value: ind.id,
+    label: ind.name,
+  }))
+})
+
 // Full form model (from store)
 const { draftFilters: formModel } = storeToRefs(searchStore)
-
-// Vacancy text query: backend validates 'field' strictly against TextQueryDTO enum (resume-style fields).
-// Для поиска вакансий отправляем 'everywhere', а конкретные области (название, компания, описание)
-// задаются отдельным фильтром searchField.
-const TEXT_QUERY_FIELDS = [
-  { value: 'name', label: 'В названии вакансии' },
-  { value: 'company_name', label: 'В названии компании' },
-  { value: 'description', label: 'В описании вакансии' }
-]
-
-const TEXT_QUERY_LOGIC = [
-  { value: 'all', label: 'Все слова' },
-  { value: 'any', label: 'Любое из слов' },
-  { value: 'phrase', label: 'Точная фраза' },
-  { value: 'except', label: 'Исключить слова' }
-]
-
-const TEXT_QUERY_PERIODS = [
-  { value: 'all_time', label: 'За все время' },
-  { value: 'last_year', label: 'За последний год' },
-  { value: 'last_three_years', label: 'За последние 3 года' },
-  { value: 'last_six_years', label: 'За последние 6 лет' }
-]
 
 // Vacancy search field options (areas to search within)
 const SEARCH_FIELD_OPTIONS = [
@@ -100,15 +96,6 @@ const SEARCH_FIELD_OPTIONS = [
   { value: 'company_name', label: 'Название компании' },
   { value: 'description', label: 'Описание вакансии' }
 ]
-
-const onCreateTextQuery = () => {
-  return {
-    text: '',
-    logic: 'all',
-    field: 'everywhere',
-    period: 'all_time'
-  }
-}
 
 // Suggestions logic
 const positionOptions = ref<{label: string, value: string}[]>([])
@@ -139,7 +126,7 @@ const handlePositionSearch = (query: string) => {
 }
 
 const handleKeywordSearch = (query: string) => {
-  if (!query || query.length < 3) {
+  if (!query || query.length < 2) {
     keywordOptions.value = []
     return
   }
@@ -193,39 +180,25 @@ const handleSearch = async () => {
       filters.period = formModel.value.searchPeriod
     }
 
-    // Text queries: collect non-empty ones + position phrase
-    const textQueries: any[] = (raw.textQueries || [])
-      .filter((q: any) => q.text?.trim())
-      .map((q: any) => ({
-        text: q.text.trim(),
-        logic: q.logic || 'all',
-        // Для вакансий всегда ищем "везде", конкретные области задаются через searchField
-        field: 'everywhere'
-        // 'period' is not supported for vacancy text queries
-      }))
-
+    // Advanced text search fields
+    const textParts = []
     if (formModel.value.position?.trim()) {
-      textQueries.push({
-        text: formModel.value.position.trim(),
-        logic: 'phrase',
-        // По должности тоже ищем "везде", а область уточняется через searchField
-        field: 'everywhere'
-      })
+      textParts.push(`"${formModel.value.position.trim()}"`)
     }
-    if (textQueries.length > 0) {
-      filters.textQueries = textQueries
+    if (formModel.value.text?.trim()) {
+      textParts.push(formModel.value.text.trim())
+    }
+    if (textParts.length > 0) {
+      filters.text = textParts.join(' ')
+    }
+
+    if (formModel.value.excluded_text?.trim()) {
+      filters.excluded_text = formModel.value.excluded_text.trim()
     }
 
     // Areas: numeric array
     if (Array.isArray(raw.areas) && raw.areas.length > 0) {
       filters.areas = raw.areas.map(Number)
-    }
-
-    // Metro: accept string or array, coerce to number[]
-    if (raw.metro) {
-      const metroArr = Array.isArray(raw.metro) ? raw.metro : [raw.metro]
-      const metroNums = metroArr.map(Number).filter((n: number) => !isNaN(n))
-      if (metroNums.length > 0) filters.metro = metroNums
     }
 
     // Salary — HH vacancies API expects single `salary` + `currency`
@@ -236,47 +209,38 @@ const handleSearch = async () => {
       }
     }
 
-    // Simple array/string fields — only include if non-empty
-    const arrayFields = [
-      'experience', 'educationLevels', 'driverLicenseTypes',
-      'professionalRole', 'searchField', 'employment', 'schedule'
-    ] as const
+    if (Array.isArray(raw.search_field) && raw.search_field.length > 0) filters.search_field = raw.search_field
+    if (Array.isArray(raw.experience) && raw.experience.length > 0) filters.experience = raw.experience
+    if (Array.isArray(raw.educationLevels) && raw.educationLevels.length > 0) filters.education = raw.educationLevels
+    if (Array.isArray(raw.professionalRole) && raw.professionalRole.length > 0) filters.professional_role = raw.professionalRole.map(Number).filter((v: number) => !isNaN(v))
+    if (Array.isArray(raw.industry) && raw.industry.length > 0) filters.industry = raw.industry
+    if (Array.isArray(raw.employmentForm) && raw.employmentForm.length > 0) filters.employment_form = raw.employmentForm
+    if (Array.isArray(raw.workScheduleByDays) && raw.workScheduleByDays.length > 0) filters.work_schedule_by_days = raw.workScheduleByDays
+    if (Array.isArray(raw.workingHours) && raw.workingHours.length > 0) filters.working_hours = raw.workingHours
+    if (Array.isArray(raw.workFormat) && raw.workFormat.length > 0) filters.work_format = raw.workFormat
+    if (Array.isArray(raw.driverLicenseTypes) && raw.driverLicenseTypes.length > 0) filters.driver_license_types = raw.driverLicenseTypes
 
-    // Map vacancy-specific UI field names to standard DTO names
-    if (Array.isArray(raw.employmentForm) && raw.employmentForm.length > 0) {
-      raw.employment = raw.employmentForm
-    }
-    if (Array.isArray(raw.workScheduleByDays) && raw.workScheduleByDays.length > 0) {
-      raw.schedule = raw.workScheduleByDays
-    }
-
-    for (const key of arrayFields) {
-      const val = raw[key]
-      if (Array.isArray(val) && val.length > 0) {
-        if (key === 'professionalRole') {
-          filters[key] = val.map(Number).filter(v => !isNaN(v))
-        } else {
-          filters[key] = val
-        }
-      }
+    // Labels
+    if (Array.isArray(raw.vacancyLabels) && raw.vacancyLabels.length > 0) {
+      filters.label = raw.vacancyLabels
     }
 
-    // Employer IDs — from the dedicated selectedEmployerIds ref (actual HH company IDs)
+    // Employer IDs
     if (Array.isArray(selectedEmployerIds.value) && selectedEmployerIds.value.length > 0) {
-      filters.employerIds = selectedEmployerIds.value.filter(id => id && /^\d+$/.test(id))
-      if (filters.employerIds.length === 0) delete filters.employerIds
+      const eIds = selectedEmployerIds.value.filter(id => id && /^\d+$/.test(id))
+      if (eIds.length > 0) filters.employer_id = eIds
     }
 
     // Date fields
-    if (raw.dateFrom) filters.dateFrom = raw.dateFrom
-    if (raw.dateTo) filters.dateTo = raw.dateTo
+    if (raw.dateFrom) filters.date_from = raw.dateFrom
+    if (raw.dateTo) filters.date_to = raw.dateTo
 
     // Ordering
-    if (raw.orderBy) filters.orderBy = raw.orderBy
+    if (raw.orderBy) filters.order_by = raw.orderBy
 
     // Pagination
     filters.page = 0
-    filters.perPage = 20
+    filters.per_page = 20
 
     if (!selectedTeamId.value) {
       console.error('Team not selected')
@@ -349,18 +313,19 @@ const handleSearch = async () => {
         <n-space vertical>
           <!-- Position Field and Search Period -->
           <n-grid :cols="4" x-gap="12">
-            <n-form-itemGi :span="3" label="Должность (Искать в названии вакансии по точной фразе за все время)">
-              <n-auto-complete
-                v-model:value="formModel.position"
-                :options="positionOptions"
-                placeholder="Например: Frontend-разработчик"
-                clearable
-                @update:value="handlePositionSearch"
-              />
-            </n-form-itemGi>
-            <n-form-itemGi :span="1" label="Период публикации">
+            <n-form-itemGi :span="2">
+              <template #label>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  Период публикации вакансии
+                  <n-tooltip trigger="hover">
+                    <template #trigger>
+                      <n-icon :component="InfoIcon" color="#50b5d6" style="cursor: pointer;" />
+                    </template>
+                    Количество дней (от 1 до 365), за которое необходимо выполнить поиск вакансий от текущей даты
+                  </n-tooltip>
+                </div>
+              </template>
               <n-input-number
-                status="warning"
                 v-model:value="formModel.searchPeriod"
                 placeholder="Дней"
                 clearable
@@ -372,36 +337,40 @@ const handleSearch = async () => {
 
           <!-- Keywords / Text Queries -->
           <n-form-item label="Ключевые слова и параметры текстового поиска">
-            <n-dynamic-input
-              v-model:value="formModel.textQueries"
-              :on-create="onCreateTextQuery"
-            >
-              <template #create-button-default>
-                Добавить условие поиска
-              </template>
-              <template #default="{ value }">
-                <n-space vertical style="width: 100%; border: 1px solid var(--n-border-color); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+            <n-grid :cols="3" x-gap="12">
+              <n-form-itemGi :show-feedback="false">
+                <template #label>
+                  <div style="display: flex; align-items: center; gap: 4px;">
+                    Ключевые слова
+                    <n-tooltip trigger="hover">
+                      <template #trigger>
+                        <n-icon :component="LogicTreeIcon" color="#50b5d6" style="cursor: pointer;" @click="showQueryBuilder = true" />
+                      </template>
+                      Конструктор сложных логических запросов
+                    </n-tooltip>
+                  </div>
+                </template>
+                <div style="display: flex; width: 100%;">
                   <n-auto-complete
-                    v-model:value="value.text"
-                    placeholder="Введите ключевые слова..."
+                    v-model:value="formModel.text"
+                    placeholder="Например: Бухгалтер-кассир"
                     :options="keywordOptions"
                     clearable
                     @update:value="handleKeywordSearch"
                   />
-                  <n-grid :cols="3" x-gap="12">
-                    <n-form-itemGi label="Где искать?" :show-feedback="false">
-                      <n-select v-model:value="value.field" :options="TEXT_QUERY_FIELDS" />
-                    </n-form-itemGi>
-                    <n-form-itemGi label="Условие" :show-feedback="false">
-                      <n-select v-model:value="value.logic" :options="TEXT_QUERY_LOGIC" />
-                    </n-form-itemGi>
-                    <n-form-itemGi label="Период" :show-feedback="false">
-                      <n-select v-model:value="value.period" :options="TEXT_QUERY_PERIODS" />
-                    </n-form-itemGi>
-                  </n-grid>
-                </n-space>
-              </template>
-            </n-dynamic-input>
+                </div>
+              </n-form-itemGi>
+              <n-form-itemGi label="Где искать?" :show-feedback="false">
+                <n-select v-model:value="formModel.search_field" :options="SEARCH_FIELD_OPTIONS" multiple clearable placeholder="Во всех полях" />
+              </n-form-itemGi>
+              <n-form-itemGi label="Исключить слова" :show-feedback="false">
+                <n-input
+                  v-model:value="formModel.excluded_text"
+                  placeholder="Слова через запятую"
+                  clearable
+                />
+              </n-form-itemGi>
+            </n-grid>
           </n-form-item>
 
           <!-- Geography -->
@@ -420,7 +389,6 @@ const handleSearch = async () => {
             </n-form-itemGi>
             <n-form-itemGi label="Работодатели (поиск по названию компании)">
               <n-select
-                status="warning"
                 v-model:value="selectedEmployerIds"
                 multiple
                 filterable
@@ -436,11 +404,11 @@ const handleSearch = async () => {
 
           <!-- Salary -->
           <n-grid :cols="3" x-gap="12">
-            <n-form-itemGi label="Валюта">
-              <n-select v-model:value="formModel.currency" :options="CURRENCY_OPTIONS" />
-            </n-form-itemGi>
             <n-form-itemGi label="Зарплата">
               <n-input-number v-model:value="formModel.salary" clearable />
+            </n-form-itemGi>
+            <n-form-itemGi label="Валюта">
+              <n-select v-model:value="formModel.currency" :options="CURRENCY_OPTIONS" />
             </n-form-itemGi>
           </n-grid>
 
@@ -462,9 +430,9 @@ const handleSearch = async () => {
 
           <!-- Extra Work Filters and Labels -->
           <n-grid :cols="2" x-gap="12">
-            <n-form-itemGi label="Подработка / Рабочие часы">
+            <!-- <n-form-itemGi label="Подработка / Рабочие часы">
               <n-select v-model:value="formModel.workingHours" :options="VACANCY_WORKING_HOURS" multiple clearable />
-            </n-form-itemGi>
+            </n-form-itemGi> -->
             <n-form-itemGi label="Метки вакансий">
               <n-select v-model:value="formModel.vacancyLabels" :options="VACANCY_LABEL" multiple clearable />
             </n-form-itemGi>
@@ -474,7 +442,7 @@ const handleSearch = async () => {
           <n-collapse>
             <n-collapse-item title="Дополнительные фильтры" name="1">
               
-              <n-form-item label="Профессиональная роль">
+              <!-- <n-form-item label="Профессиональная роль">
                 <n-tree-select
                   v-model:value="formModel.professionalRole"
                   :options="roleOptions"
@@ -485,15 +453,19 @@ const handleSearch = async () => {
                   clearable
                   placeholder="Выберите роли"
                 />
-              </n-form-item>
+              </n-form-item> -->
 
-              <!-- Location & Travel -->
-              <n-text depth="3" style="margin-bottom: 8px; display: block;">Местоположение</n-text>
-              <n-grid :cols="1" x-gap="12">
-                <n-form-itemGi label="Станция метро (название или ID)">
-                  <n-input v-model:value="formModel.metro" placeholder="Ветка или станция..." />
-                </n-form-itemGi>
-              </n-grid>
+              <!-- Company & Industry -->
+              <n-text depth="3" style="margin-bottom: 8px; display: block;">Компания</n-text>
+              <n-form-item label="Отрасль компании">
+                <n-select
+                  v-model:value="formModel.industry"
+                  :options="industryOptions"
+                  multiple
+                  clearable
+                  placeholder="Выберите отрасли"
+                />
+              </n-form-item>
 
               <!-- Education -->
               <n-text depth="3" style="margin-bottom: 8px; display: block;">Образование</n-text>
@@ -501,11 +473,6 @@ const handleSearch = async () => {
                 <n-select v-model:value="formModel.educationLevels" :options="EDUCATION_LEVEL" multiple clearable />
               </n-form-item>
 
-              <!-- Search Field -->
-              <n-text depth="3" style="margin-bottom: 8px; display: block;">Области поиска</n-text>
-              <n-form-item label="Области поиска в вакансиях">
-                <n-select v-model:value="formModel.searchField" :options="SEARCH_FIELD_OPTIONS" multiple clearable placeholder="Где искать по тексту" />
-              </n-form-item>
 
               <!-- Other Filters -->
               <n-text depth="3" style="margin-bottom: 8px; display: block;">Автомобиль / Права</n-text>
@@ -530,4 +497,6 @@ const handleSearch = async () => {
       </n-form>
     </n-space>
   </n-card>
+
+  <HHQueryBuilderModal :show="showQueryBuilder" @update:show="val => showQueryBuilder = val" :initial-query="formModel.text" @submit="handleQuerySubmit" />
 </template>

@@ -16,5 +16,9 @@ export const dictionaryApi = {
     },
     getSkills(): Promise<DictionaryItem[]> {
         return apiClient<DictionaryItem[]>('/v1/static/skills');
-    }
+  },
+
+  getIndustries(): Promise<DictionaryItem[]> {
+    return apiClient<DictionaryItem[]>('/v1/static/industries');
+  },
 };

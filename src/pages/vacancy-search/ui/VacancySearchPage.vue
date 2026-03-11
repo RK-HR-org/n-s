@@ -9,8 +9,7 @@ const currentPage = ref(1)
 const handlePageUpdate = (page: number) => {
   currentPage.value = page
   if (searchStore.currentSessionId) {
-    const perPage = 20
-    searchStore.loadSessionItems(searchStore.currentSessionId, perPage, (page - 1) * perPage)
+    searchStore.loadSessionItems(searchStore.currentSessionId, page - 1)
   }
 }
 
@@ -49,11 +48,12 @@ const formattedFilters = computed(() => {
     if (f.position) items.push({ label: 'Должность', tags: [f.position] })
 
     // Text queries
-    if (f.textQueries && f.textQueries.length) {
-        const filled = f.textQueries.filter((q: any) => q.text.trim() !== '')
-        if (filled.length) {
-            items.push({ label: 'Ключевые слова', tags: filled.map((q: any) => q.text) })
-        }
+    if (f.text) {
+        items.push({ label: 'Ключевые слова', tags: [f.text] })
+    }
+
+    if (f.excluded_text) {
+        items.push({ label: 'Исключить слова', tags: [f.excluded_text] })
     }
 
     // Areas (regions)
@@ -63,33 +63,43 @@ const formattedFilters = computed(() => {
     }
 
     // Salary
-    if (f.salaryFrom || f.salaryTo) {
-        const from = f.salaryFrom ? `от ${f.salaryFrom.toLocaleString('ru-RU')}` : ''
-        const to = f.salaryTo ? `до ${f.salaryTo.toLocaleString('ru-RU')}` : ''
-        items.push({ label: 'Зарплата', tags: [`${from} ${to} ${f.currency || ''}`.trim()] })
+    if (f.salary) {
+        items.push({ label: 'Зарплата', tags: [`от ${f.salary.toLocaleString('ru-RU')} ${f.currency || 'RUR'}`.trim()] })
     }
 
     // Experience & Employment
     const expTags = getDictTags(f.experience, EXPERIENCE)
     if (expTags.length) items.push({ label: 'Опыт работы', tags: expTags })
 
-    const empTags = getDictTags(f.employment, EMPLOYMENT)
+    const empTags = getDictTags(f.employmentForm, EMPLOYMENT)
     if (empTags.length) items.push({ label: 'Занятость', tags: empTags })
 
-    const schedTags = getDictTags(f.schedule, SCHEDULE)
+    const schedTags = getDictTags(f.workScheduleByDays, SCHEDULE)
     if (schedTags.length) items.push({ label: 'График', tags: schedTags })
+
+    // Other Formats
+    if (f.workFormat && f.workFormat.length) {
+        items.push({ label: 'Формат работы', tags: f.workFormat })
+    }
 
     // Employer IDs
     if (f.employerIds && f.employerIds.length) items.push({ label: 'Работодатели', tags: f.employerIds })
 
     // Search Field
-    if (f.searchField && f.searchField.length) {
-        const fieldLabels: Record<string, string> = { name: 'Название', company_name: 'Компания', description: 'Описание' }
-        items.push({ label: 'Области поиска', tags: f.searchField.map((s: string) => fieldLabels[s] || s) })
+    if (f.search_field && f.search_field.length) {
+        const fieldLabels: Record<string, string> = { name: 'Название вакансии', company_name: 'Название компании', description: 'Описание вакансии' }
+        items.push({ label: 'Области поиска', tags: f.search_field.map((s: string) => fieldLabels[s] || s) })
     }
 
-    // Skills
-    if (f.skills && f.skills.length) items.push({ label: 'Навыки', tags: f.skills })
+    // Labels
+    if (f.vacancyLabels && f.vacancyLabels.length) {
+        items.push({ label: 'Метки вакансий', tags: f.vacancyLabels })
+    }
+
+    // Driver Licenses
+    if (f.driverLicenseTypes && f.driverLicenseTypes.length) {
+        items.push({ label: 'Категории прав', tags: f.driverLicenseTypes })
+    }
 
     return items
 })

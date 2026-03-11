@@ -9,9 +9,7 @@ const currentPage = ref(1)
 const handlePageUpdate = (page: number) => {
   currentPage.value = page
   if (searchStore.currentSessionId) {
-    // Pagination offset calculation: (page - 1) * perPage
-    const perPage = 20
-    searchStore.loadSessionItems(searchStore.currentSessionId, perPage, (page - 1) * perPage)
+    searchStore.loadSessionItems(searchStore.currentSessionId, page - 1)
   }
 }
 
