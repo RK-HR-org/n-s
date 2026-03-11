@@ -24,6 +24,23 @@ const positivePrompt = ref('')
 const negativePrompt = ref('')
 const searchStore = useSearchStore()
 
+import LogicTreeIcon from '@/shared/ui/icons/LogicTreeIcon.vue'
+import { HHQueryBuilderModal } from '@/features/hh-query-builder'
+
+const showQueryBuilder = ref(false)
+const activeTextQueryRef = ref<any>(null)
+
+const openQueryBuilder = (queryObj: any) => {
+  activeTextQueryRef.value = queryObj
+  showQueryBuilder.value = true
+}
+
+const handleQuerySubmit = (query: string) => {
+  if (activeTextQueryRef.value) {
+    activeTextQueryRef.value.text = query
+  }
+}
+
 const handleEnrich = async () => {
   if (!positivePrompt.value && !negativePrompt.value) return
   try {
@@ -279,13 +296,24 @@ const handleSearch = async () => {
               </template>
               <template #default="{ value }">
                 <n-space vertical style="width: 100%; border: 1px solid var(--n-border-color); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
-                  <n-auto-complete
-                    v-model:value="value.text"
-                    placeholder="Введите ключевые слова..."
-                    :options="keywordOptions"
-                    clearable
-                    @update:value="handleKeywordSearch"
-                  />
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <n-auto-complete
+                      v-model:value="value.text"
+                      placeholder="Введите ключевые слова..."
+                      :options="keywordOptions"
+                      clearable
+                      @update:value="handleKeywordSearch"
+                      style="flex: 1;"
+                    />
+                    <n-tooltip trigger="hover">
+                      <template #trigger>
+                        <n-button circle tertiary @click="openQueryBuilder(value)">
+                          <template #icon><n-icon :component="LogicTreeIcon" color="#50b5d6" /></template>
+                        </n-button>
+                      </template>
+                      Конструктор сложных логических запросов
+                    </n-tooltip>
+                  </div>
                   <n-grid :cols="3" x-gap="12">
                     <n-form-itemGi label="Где искать?" :show-feedback="false">
                       <n-select v-model:value="value.field" :options="TEXT_QUERY_FIELDS" />
@@ -368,7 +396,7 @@ const handleSearch = async () => {
                 </n-form-itemGi>
               </n-grid>
               
-              <n-form-item label="Профессиональная роль">
+              <!-- <n-form-item label="Профессиональная роль">
                 <n-tree-select
                   v-model:value="formModel.professionalRole"
                   :options="roleOptions"
@@ -379,7 +407,7 @@ const handleSearch = async () => {
                   clearable
                   placeholder="Выберите роли"
                 />
-              </n-form-item>
+              </n-form-item> -->
 
               <!-- Relocation & Travel -->
               <n-text depth="3" style="margin-bottom: 8px; display: block;">Местоположение и поездки (в разработке)</n-text>
@@ -436,4 +464,6 @@ const handleSearch = async () => {
       </n-form>
     </n-space>
   </n-card>
+
+  <HHQueryBuilderModal :show="showQueryBuilder" @update:show="val => showQueryBuilder = val" :initial-query="activeTextQueryRef?.text" @submit="handleQuerySubmit" />
 </template>

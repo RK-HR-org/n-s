@@ -98,11 +98,11 @@ const lastExperience = computed(() => {
         </n-text>
         <n-space size="small">
           <n-button size="small" secondary type="primary" tag="a" :href="resume?.alternate_url || resume?.url" target="_blank">
-            Открыть полностью
+            Открыть на HH.ru
           </n-button>
-          <n-button size="small" secondary>
+          <!-- <n-button size="small" secondary>
             В избранное
-          </n-button>
+          </n-button> -->
         </n-space>
       </div>
     </n-space>

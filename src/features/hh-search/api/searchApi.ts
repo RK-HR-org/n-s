@@ -13,6 +13,9 @@ export interface TextQueryDTO {
 }
 
 export interface AdvancedSearchFiltersDTO {
+    text?: string
+    excluded_text?: string
+    search_field?: string[] | null
     textQueries?: TextQueryDTO[]
     ageFrom?: number | null
     ageTo?: number | null
@@ -41,12 +44,43 @@ export interface AdvancedSearchFiltersDTO {
     perPage?: number
 }
 
+export interface VacancySearchFiltersDTO {
+    text?: string | null
+    excluded_text?: string | null
+    search_field?: string[] | null
+    areas?: number[] | null
+    metro?: number[] | null
+    employment_form?: string[] | null
+    work_schedule_by_days?: string[] | null
+    working_hours?: string[] | null
+    work_format?: string[] | null
+    experience?: string[] | null
+    professional_role?: number[] | null
+    industry?: string[] | null
+    education?: string[] | null
+    employer_id?: string[] | null
+    salary?: number | null
+    currency?: string | null
+    only_with_salary?: boolean | null
+    label?: string[] | null
+    period?: number | null
+    date_from?: string | null
+    date_to?: string | null
+    accept_temporary?: boolean | null
+    no_magic?: boolean | null
+    order_by?: string | null
+    clusters?: boolean | null
+    page?: number | null
+    per_page?: number | null
+}
+
 export interface SearchCreateRequest {
     team_id: string
     mode?: 'resumes' | 'vacancies'
     searchType: 'simple' | 'advanced'
     queryRaw?: any
     filters?: AdvancedSearchFiltersDTO
+    vacancy_filters?: VacancySearchFiltersDTO
 }
 
 export interface SearchEnrichRequest {
@@ -57,7 +91,9 @@ export interface SearchEnrichRequest {
 }
 
 export interface SearchExecuteRequest {
+    page?: number // 0-indexed page number
     override_filters?: AdvancedSearchFiltersDTO
+    override_vacancy_filters?: VacancySearchFiltersDTO
 }
 
 export const searchApi = {

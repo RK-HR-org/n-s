@@ -6,6 +6,7 @@ import type { AreaItem, ProfessionalRoleCategory, DictionaryItem } from './types
 export const useDictionaryStore = defineStore('dictionary', () => {
     const areas = ref<AreaItem[]>([]);
     const professionalRoles = ref<ProfessionalRoleCategory[]>([]);
+    const industries = ref<DictionaryItem[]>([]);
     const skills = ref<DictionaryItem[]>([]);
 
     const isLoading = ref(false);
@@ -16,13 +17,15 @@ export const useDictionaryStore = defineStore('dictionary', () => {
         isLoading.value = true;
         try {
             // Use the individual endpoints to be safe
-            const [areasData, rolesData] = await Promise.all([
+            const [areasData, rolesData, industriesData] = await Promise.all([
                 dictionaryApi.getAreas().catch(() => []),
-                dictionaryApi.getProfessionalRoles().catch(() => ({ categories: [] }))
+                dictionaryApi.getProfessionalRoles().catch(() => ({ categories: [] })),
+                dictionaryApi.getIndustries().catch(() => []),
             ]);
 
             areas.value = areasData;
             professionalRoles.value = rolesData.categories;
+            industries.value = industriesData;
         } catch (e) {
             console.error('Failed to load statics:', e);
         } finally {
@@ -30,5 +33,5 @@ export const useDictionaryStore = defineStore('dictionary', () => {
         }
     };
 
-    return { areas, professionalRoles, skills, isLoading, fetchAll };
+    return { areas, professionalRoles, industries, skills, isLoading, fetchAll };
 });

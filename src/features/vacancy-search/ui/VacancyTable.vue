@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, ref, computed } from 'vue'
-import { NDataTable, NSpace, NText, NTag, NButton } from 'naive-ui'
+import { NDataTable, NSpace, NText, NTag, NButton, NAlert } from 'naive-ui'
 
 const props = defineProps<{
   vacancies: any[]
@@ -162,6 +162,16 @@ const sortedVacancies = computed(() => {
 
 <template>
   <div class="vacancy-table">
+    <div style="margin-bottom: 24px;">
+      <n-space justify="space-between" align="center" style="margin-bottom: 16px;" v-if="!isLoading && total > 0">
+        <n-text strong style="font-size: 18px;">Найдено вакансий: {{ total.toLocaleString('ru-RU') }}</n-text>
+      </n-space>
+      
+      <n-alert v-if="!isLoading && total > 100" type="warning" show-icon style="margin-bottom: 16px;">
+        Найдено более 100 результатов. Возможно, ваши фильтры слишком общие. Рекомендуется уточнить запрос для более точной выдачи.
+      </n-alert>
+    </div>
+
     <n-data-table
       :columns="columns"
       :data="sortedVacancies"

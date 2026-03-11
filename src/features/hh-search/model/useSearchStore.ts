@@ -94,15 +94,32 @@ export const useSearchStore = defineStore('hh-search', () => {
         }
     }
 
-    // Load items with pagination
-    const loadSessionItems = async (sessionId: string, limit = 20, offset = 0) => {
+    // Load items for live search pagination
+    const loadSessionItems = async (sessionId: string, page = 0) => {
+        isLoading.value = true
+        try {
+            const executeResponse = await searchApi.executeSession(sessionId, { page })
+            searchResults.value = (executeResponse.items || []).map((item: any) => item.raw_data || item)
+            totalResults.value = executeResponse.found || executeResponse.total || 0
+        } catch (e) {
+            console.error('Load items error:', e)
+        } finally {
+            isLoading.value = false
+        }
+    }
+
+    // Fetch items from DB for session history
+    const fetchSessionHistoryItems = async (sessionId: string, limit = 1000, offset = 0) => {
         isLoading.value = true
         try {
             const itemsResponse = await searchApi.getSessionItems(sessionId, limit, offset)
             searchResults.value = (itemsResponse.items || []).map((item: any) => item.raw_data || item)
-            totalResults.value = itemsResponse.total || itemsResponse.found || 0
+            // totalResults.value = itemsResponse.total || itemsResponse.found || itemsResponse.items?.length || 0
+            if (itemsResponse.items) {
+                totalResults.value = itemsResponse.total || itemsResponse.found || itemsResponse.items.length
+            }
         } catch (e) {
-            console.error('Load items error:', e)
+            console.error('Fetch history items error:', e)
         } finally {
             isLoading.value = false
         }
@@ -197,6 +214,7 @@ export const useSearchStore = defineStore('hh-search', () => {
         totalSessions,
         submitSearch,
         loadSessionItems,
+        fetchSessionHistoryItems,
         enrichFilters,
         fetchSessions,
         fetchSessionMetadata

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { searchApi, type AdvancedSearchFiltersDTO } from '@/features/hh-search/api/searchApi'
+import { searchApi, type AdvancedSearchFiltersDTO, type VacancySearchFiltersDTO } from '@/features/hh-search/api/searchApi'
 import { useUserStore } from '@/entities/user'
 
 export const useVacancySearchStore = defineStore('vacancy-search', () => {
@@ -16,9 +16,10 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
     const draftFilters = ref<any>({
         position: '',
         searchPeriod: null,
-        textQueries: [{ text: '', logic: 'all', field: 'everywhere', period: 'all_time' }],
+        // По умолчанию текстовый поиск "везде"
+        text: '',
+        excluded_text: '',
         areas: null,
-        metro: null,
         period: null,
         dateFrom: null,
         dateTo: null,
@@ -32,10 +33,11 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
         driverLicenseTypes: null,
         salary: null,
         currency: 'RUR',
+        industry: null,
         professionalRole: null,
         // Vacancy-specific
         employerIds: null,
-        searchField: null,
+        search_field: null,
         orderBy: 'relevance'
     })
 
@@ -50,7 +52,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
     }
 
     // Create search session with filters (mode: 'vacancies')
-    const submitSearch = async (filters: AdvancedSearchFiltersDTO, passedTeamId?: string, vacancyLabels?: string[] | null) => {
+    const submitSearch = async (filters: VacancySearchFiltersDTO, passedTeamId?: string, vacancyLabels?: string[] | null) => {
         isLoading.value = true
         try {
             const teamId = passedTeamId || getActiveTeamId()
@@ -60,7 +62,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
                 team_id: teamId,
                 mode: 'vacancies',
                 searchType: 'advanced',
-                filters
+                vacancy_filters: filters
             })
 
             const sessionId = createResponse.id
@@ -92,11 +94,11 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
     }
 
     // Load items with pagination
-    const loadSessionItems = async (sessionId: string, limit = 20, offset = 0) => {
+    const loadSessionItems = async (sessionId: string, page = 0) => {
         isLoading.value = true
         try {
-            const itemsResponse = await searchApi.getSessionItems(sessionId, limit, offset)
-            let items = (itemsResponse.items || []).map((item: any) => item.raw_data || item)
+            const executeResponse = await searchApi.executeSession(sessionId, { page })
+            let items = (executeResponse.items || []).map((item: any) => item.raw_data || item)
 
             if (clientVacancyLabels.value?.includes('with_salary')) {
                 items = items.filter((v: any) => !!v?.salary)
@@ -105,7 +107,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
             searchResults.value = items
             totalResults.value = clientVacancyLabels.value?.includes('with_salary')
                 ? items.length
-                : (itemsResponse.total || itemsResponse.found || 0)
+                : (executeResponse.found || executeResponse.total || 0)
         } catch (e) {
             console.error('Load vacancy items error:', e)
         } finally {
@@ -114,7 +116,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
     }
 
     // AI Enrich filters
-    const enrichFilters = async (positivePrompt: string, negativePrompt: string, currentFilters: AdvancedSearchFiltersDTO, passedTeamId?: string) => {
+    const enrichFilters = async (positivePrompt: string, negativePrompt: string, currentFilters: VacancySearchFiltersDTO, passedTeamId?: string) => {
         isEnriching.value = true
         try {
             let sessionId = currentSessionId.value
@@ -125,7 +127,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
                     team_id: teamId,
                     mode: 'vacancies',
                     searchType: 'advanced',
-                    filters: currentFilters
+                    vacancy_filters: currentFilters
                 })
                 sessionId = createResponse.id
                 currentSessionId.value = sessionId
