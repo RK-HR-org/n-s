@@ -212,7 +212,7 @@ const handleSearch = async () => {
     if (Array.isArray(raw.search_field) && raw.search_field.length > 0) filters.search_field = raw.search_field
     if (Array.isArray(raw.experience) && raw.experience.length > 0) filters.experience = raw.experience
     if (Array.isArray(raw.educationLevels) && raw.educationLevels.length > 0) filters.education = raw.educationLevels
-    if (Array.isArray(raw.professionalRole) && raw.professionalRole.length > 0) filters.professional_role = raw.professionalRole.map(Number).filter(v => !isNaN(v))
+    if (Array.isArray(raw.professionalRole) && raw.professionalRole.length > 0) filters.professional_role = raw.professionalRole.map(Number).filter((v: number) => !isNaN(v))
     if (Array.isArray(raw.industry) && raw.industry.length > 0) filters.industry = raw.industry
     if (Array.isArray(raw.employmentForm) && raw.employmentForm.length > 0) filters.employment_form = raw.employmentForm
     if (Array.isArray(raw.workScheduleByDays) && raw.workScheduleByDays.length > 0) filters.work_schedule_by_days = raw.workScheduleByDays
