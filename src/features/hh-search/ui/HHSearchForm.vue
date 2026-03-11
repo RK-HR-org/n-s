@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
-  NForm, NFormItem, NInput, NSelect, NButton, NSpace, NDivider, NGrid, NFormItemGi, NInputNumber, NCard, NText, NTreeSelect, NDatePicker, NCollapse, NCollapseItem, NDynamicInput, NIcon, NAutoComplete, NTooltip
+  NForm, NFormItem, NInput, NSelect, NButton, NSpace, NDivider, NGrid, NFormItemGi, NInputNumber, NCard, NText, NTreeSelect, NDatePicker, NCollapse, NCollapseItem, NDynamicInput, NIcon, NAutoComplete, NTooltip, useMessage
 } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { useDictionaryStore } from '@/entities/dictionary'
@@ -15,7 +15,7 @@ import { useUserStore } from '@/entities/user'
 import { staticApi } from '@/shared/api'
 
 const userStore = useUserStore()
-
+const message = useMessage()
 
 const selectedTeamId = ref(userStore.user?.teams?.[0]?.id || userStore.user?.teams?.[0] || null)
 
@@ -52,10 +52,109 @@ const handleEnrich = async () => {
     )
     if (enriched) {
       // Map enriched values back to formModel
-      Object.assign(formModel.value, enriched)
+      const mapped: any = { ...enriched }
+      
+      // Map text_queries to textQueries
+      const newTextQueries: any[] = []
+
+      if (mapped.text_queries) {
+        mapped.text_queries.forEach((q: any) => {
+          newTextQueries.push({
+            text: q.text || '',
+            logic: q.logic || 'all',
+            field: q.field || 'everywhere',
+            period: q.period || 'all_time'
+          })
+        })
+        delete mapped.text_queries
+      }
+
+      if (mapped.keywords_include) {
+        mapped.keywords_include.forEach((k: string) => {
+          newTextQueries.push({ text: k, logic: 'all', field: 'everywhere', period: 'all_time' })
+        })
+        delete mapped.keywords_include
+      }
+
+      if (mapped.keywords_exclude) {
+        mapped.keywords_exclude.forEach((k: string) => {
+          newTextQueries.push({ text: k, logic: 'except', field: 'everywhere', period: 'all_time' })
+        })
+        delete mapped.keywords_exclude
+      }
+
+      if (mapped.skills) {
+        mapped.skills.forEach((s: string) => {
+          newTextQueries.push({ text: s, logic: 'all', field: 'skills', period: 'all_time' })
+        })
+        delete mapped.skills
+      }
+
+      if (newTextQueries.length > 0) {
+        mapped.textQueries = newTextQueries
+      }
+
+      // Helper to find area ID by name
+      const findAreaIdByName = (areas: any[], name: string): number | null => {
+        for (const area of areas) {
+          if (area.name.toLowerCase() === name.toLowerCase()) return Number(area.id)
+          if (area.areas && area.areas.length > 0) {
+            const found = findAreaIdByName(area.areas, name)
+            if (found !== null) return found
+          }
+        }
+        return null
+      }
+
+      // Map location/area handling
+      if (mapped.location) {
+        if (mapped.location.area_id) {
+          mapped.areas = [mapped.location.area_id]
+        } else if (mapped.location.area_name) {
+          const foundId = findAreaIdByName(dictStore.areas, mapped.location.area_name)
+          if (foundId) mapped.areas = [foundId]
+        }
+        delete mapped.location
+      }
+
+      // Keep salary formatting
+      if (mapped.salary) {
+        if (mapped.salary.salary_from) mapped.salaryFrom = mapped.salary.salary_from
+        if (mapped.salary.salary_to) mapped.salaryTo = mapped.salary.salary_to
+        if (mapped.salary.currency) mapped.currency = mapped.salary.currency
+        // mapped.salary.only_with_salary is handled natively if there was a checkbox, but currently omitted in resumes
+        delete mapped.salary
+      }
+
+      if (mapped.experience) {
+        if (mapped.experience.hh_experience_id) {
+          mapped.experience = [mapped.experience.hh_experience_id]
+        } else {
+          delete mapped.experience
+        }
+      }
+
+      if (mapped.age) {
+        if (mapped.age.age_from) mapped.ageFrom = mapped.age.age_from
+        if (mapped.age.age_to) mapped.ageTo = mapped.age.age_to
+        delete mapped.age
+      }
+
+      if (mapped.gender === null) delete mapped.gender
+      if (mapped.schedule && mapped.schedule.length === 0) delete mapped.schedule
+      if (mapped.employment && mapped.employment.length === 0) delete mapped.employment
+
+      Object.assign(formModel.value, mapped)
+      const importedKeys = Object.keys(mapped).filter(k => Array.isArray(mapped[k]) ? mapped[k].length > 0 : !!mapped[k])
+      if (importedKeys.length) {
+          message.success('Фильтры успешно заполнены AI')
+      } else {
+          message.info('AI не вернул фильтры')
+      }
     }
   } catch (e) {
     console.error('Failed to enrich filters', e)
+    message.error('Ошибка при генерации фильтров')
   }
 }
 
@@ -220,11 +319,11 @@ const handleSearch = async () => {
         <template #trigger>
           <div style="width: 100%;">
             <n-collapse>
-              <n-collapse-item name="ai-search" disabled>
+              <n-collapse-item name="ai-search">
                 <template #header>
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <n-icon :component="SparklesIcon" size="20" color="#F74C00" />
-                    <span style="color: var(--n-text-color-disabled);">Умный поиск (AI)</span>
+                    <span>Заполнить с помощью ИИ</span>
                   </div>
                 </template>
                 <n-grid :cols="1" y-gap="12">
@@ -232,8 +331,7 @@ const handleSearch = async () => {
                     <n-input
                       v-model:value="positivePrompt"
                       type="textarea"
-                      placeholder="Например: Бухгалтер-кассир>"
-                      disabled
+                      placeholder="Например: Бухгалтер-кассир"
                     />
                   </n-form-itemGi>
                   <n-form-itemGi label="Опишите, кто вам НЕ нужен (Негативный промпт)">
@@ -241,18 +339,17 @@ const handleSearch = async () => {
                       v-model:value="negativePrompt"
                       type="textarea"
                       placeholder="Например: без удаленки, не джуниор"
-                      disabled
                     />
                   </n-form-itemGi>
                 </n-grid>
-                <n-button type="info" secondary block style="margin-top: 12px;" @click="handleEnrich" :loading="searchStore.isEnriching" disabled>
-                  Автозаполнение фильтров с помощью AI
+                <n-button type="info" secondary block style="margin-top: 12px;" @click="handleEnrich" :loading="searchStore.isEnriching" :disabled="!positivePrompt && !negativePrompt">
+                  Заполнить с помощью ИИ
                 </n-button>
               </n-collapse-item>
             </n-collapse>
           </div>
         </template>
-        Функция в разработке
+        Функция в разработке. Пожалуйста, предварительно проверяйте заполненную форму перед запуском поиска.
       </n-tooltip>
 
       <n-divider style="margin: 12px 0;" />

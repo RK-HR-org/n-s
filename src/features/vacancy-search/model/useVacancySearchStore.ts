@@ -82,7 +82,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
             searchResults.value = items
             totalResults.value = clientVacancyLabels.value?.includes('with_salary')
                 ? items.length
-                : (executeResponse.found || executeResponse.total || 0)
+                : (executeResponse.result?.hh_found || executeResponse.found || executeResponse.total || 0)
 
             return sessionId
         } catch (e) {
@@ -107,7 +107,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
             searchResults.value = items
             totalResults.value = clientVacancyLabels.value?.includes('with_salary')
                 ? items.length
-                : (executeResponse.found || executeResponse.total || 0)
+                : (executeResponse.result?.hh_found || executeResponse.found || executeResponse.total || 0)
         } catch (e) {
             console.error('Load vacancy items error:', e)
         } finally {
