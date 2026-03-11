@@ -83,7 +83,7 @@ export const useSearchStore = defineStore('hh-search', () => {
 
             // Map the search results correctly (handling both db row structures and direct items)
             searchResults.value = (executeResponse.items || []).map((item: any) => item.raw_data || item)
-            totalResults.value = executeResponse.found || executeResponse.total || 0
+            totalResults.value = executeResponse.result?.hh_found || executeResponse.found || executeResponse.total || 0
 
             return sessionId
         } catch (e) {
@@ -100,7 +100,7 @@ export const useSearchStore = defineStore('hh-search', () => {
         try {
             const executeResponse = await searchApi.executeSession(sessionId, { page })
             searchResults.value = (executeResponse.items || []).map((item: any) => item.raw_data || item)
-            totalResults.value = executeResponse.found || executeResponse.total || 0
+            totalResults.value = executeResponse.result?.hh_found || executeResponse.found || executeResponse.total || 0
         } catch (e) {
             console.error('Load items error:', e)
         } finally {
@@ -192,10 +192,62 @@ export const useSearchStore = defineStore('hh-search', () => {
         try {
             const response = await searchApi.getSession(sessionId)
             currentSessionMetadata.value = response
+
+            // Extract real total from session results metadata
+            if (response.results && response.results.length > 0) {
+                // Find the max hh_found across all results
+                const maxFound = Math.max(...response.results.map((r: any) => r.hh_found || 0))
+                if (maxFound > 0) {
+                    totalResults.value = maxFound
+                }
+            } else if (response.result?.hh_found) {
+                totalResults.value = response.result.hh_found
+            }
+
             return response
         } catch (e) {
             console.error('Fetch session metadata error:', e)
             throw e
+        } finally {
+            isLoading.value = false
+        }
+    }
+
+    // Load all results by executing search for each page
+    const loadAllSessionResults = async (sessionId: string) => {
+        isLoading.value = true
+        try {
+            const perPage = 20
+            const allItems: any[] = []
+            let page = 0
+            let realTotal = totalResults.value || 0
+
+            // Fetch page by page until we have all items
+            while (allItems.length < realTotal || page === 0) {
+                const executeResponse = await searchApi.executeSession(sessionId, { page })
+                const pageItems = (executeResponse.items || []).map((item: any) => item.raw_data || item)
+
+                if (pageItems.length === 0) break
+
+                allItems.push(...pageItems)
+
+                // Update realTotal from response
+                const responseTotal = executeResponse.result?.hh_found || executeResponse.found || executeResponse.total || 0
+                if (responseTotal > 0) {
+                    realTotal = responseTotal
+                    totalResults.value = realTotal
+                }
+
+                page++
+
+                // Safety: don't fetch more than 50 pages (1000 items)
+                if (page >= 50) break
+            }
+
+            searchResults.value = allItems
+            totalResults.value = Math.max(realTotal, allItems.length)
+        } catch (e) {
+            console.error('Load all results error:', e)
         } finally {
             isLoading.value = false
         }
@@ -217,6 +269,7 @@ export const useSearchStore = defineStore('hh-search', () => {
         fetchSessionHistoryItems,
         enrichFilters,
         fetchSessions,
-        fetchSessionMetadata
+        fetchSessionMetadata,
+        loadAllSessionResults
     }
 })

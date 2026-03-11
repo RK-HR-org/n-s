@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { NLayout, NLayoutContent, NText, NH2, NSpace, NGrid, NGridItem, NCard, NTag, NAlert } from 'naive-ui'
+import { NLayout, NLayoutContent, NText, NH2, NSpace, NGrid, NGridItem, NCard, NTag, NAlert, NButton } from 'naive-ui'
 import { HHSearchForm, ResumeList, useSearchStore } from '@/features/hh-search'
 
 const searchStore = useSearchStore()
@@ -132,6 +132,17 @@ const formattedFilters = computed(() => {
               </n-card>
             </template>
             <template v-else>
+              <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                <n-button 
+                  type="info" 
+                  secondary 
+                  size="small" 
+                  @click="$router.push(`/search-history/${searchStore.currentSessionId}`)"
+                  v-if="searchStore.currentSessionId"
+                >
+                  Детали сессии поиска
+                </n-button>
+              </div>
               <ResumeList 
                 :resumes="searchStore.searchResults"
                 :is-loading="searchStore.isLoading"

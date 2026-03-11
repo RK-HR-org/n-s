@@ -176,6 +176,7 @@ export const VACANCY_WORKING_HOURS: Option[] = [
 
 /** Метки вакансий (vacancy_label). */
 export const VACANCY_LABEL: Option[] = [
+  { value: "with_salary", label: "С указанием зарплаты" },
   { value: "with_address", label: "Только с адресом" },
   { value: "accept_handicapped", label: "Только доступные для людей с инвалидностью" },
   { value: "not_from_agency", label: "Без вакансий агентств" },
@@ -184,6 +185,4 @@ export const VACANCY_LABEL: Option[] = [
   { value: "low_performance", label: "Только вакансии, у которых меньше 10 откликов" },
   { value: "internship", label: "Только стажировки" },
   { value: "accept_teens", label: "Только доступные для соискателей от 16 лет" },
-  // Дополнительная удобная метка для фильтра "только с зарплатой"
-  { value: "with_salary", label: "С указанием зарплаты" },
 ];

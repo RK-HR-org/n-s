@@ -47,10 +47,108 @@ const handleEnrich = async () => {
       selectedTeamId.value || undefined
     )
     if (enriched) {
-      Object.assign(formModel.value, enriched)
+      const mapped: any = { ...enriched }
+      
+      // text_queries -> text (vacancies search uses a single text string mostly)
+      let textStrings: string[] = []
+      let excludeStrings: string[] = []
+
+      if (mapped.text_queries && mapped.text_queries.length > 0) {
+        // Construct string from text queries for vacancy search which only accepts one `text` string out of the box
+        mapped.text_queries.forEach((q: any) => {
+          let t = q.text || ''
+          if (q.exact) t = `!${t}`
+          
+          if (q.logic === 'except') excludeStrings.push(t)
+          else textStrings.push(t)
+        })
+        delete mapped.text_queries
+      }
+
+      if (mapped.keywords_include) {
+        textStrings.push(...mapped.keywords_include)
+        delete mapped.keywords_include
+      }
+      if (mapped.skills) {
+        textStrings.push(...mapped.skills)
+        delete mapped.skills
+      }
+      if (mapped.keywords_exclude) {
+        excludeStrings.push(...mapped.keywords_exclude)
+        delete mapped.keywords_exclude
+      }
+
+      if (textStrings.length > 0) {
+        mapped.text = [...(formModel.value?.text ? [formModel.value.text] : []), ...textStrings].join(' ')
+      }
+      if (excludeStrings.length > 0) {
+        mapped.excluded_text = [...(formModel.value?.excluded_text ? [formModel.value.excluded_text] : []), ...excludeStrings].join(' ')
+      }
+
+      // Helper to find area ID by name
+      const findAreaIdByName = (areas: any[], name: string): number | null => {
+        for (const area of areas) {
+          if (area.name.toLowerCase() === name.toLowerCase()) return Number(area.id)
+          if (area.areas && area.areas.length > 0) {
+            const found = findAreaIdByName(area.areas, name)
+            if (found !== null) return found
+          }
+        }
+        return null
+      }
+
+      // areas
+      if (mapped.location) {
+        if (mapped.location.area_id) {
+          mapped.areas = [mapped.location.area_id]
+        } else if (mapped.location.area_name) {
+          const foundId = findAreaIdByName(dictStore.areas, mapped.location.area_name)
+          if (foundId) mapped.areas = [foundId]
+        }
+        delete mapped.location
+      }
+
+      // salary mapping
+      if (mapped.salary) {
+        if (mapped.salary.salary_from) mapped.salary = mapped.salary.salary_from
+        else if (mapped.salary.salary_to) mapped.salary = mapped.salary.salary_to
+        
+        if (mapped.salary.currency) mapped.currency = mapped.salary.currency
+        
+        if (mapped.salary.only_with_salary) {
+          if (!mapped.vacancyLabels) mapped.vacancyLabels = []
+          if (!mapped.vacancyLabels.includes('with_salary')) {
+            mapped.vacancyLabels.push('with_salary')
+          }
+        }
+        delete mapped.salary
+      }
+
+      // experience mapping
+      if (mapped.experience) {
+        if (mapped.experience.hh_experience_id) {
+          mapped.experience = [mapped.experience.hh_experience_id]
+        } else {
+          delete mapped.experience
+        }
+      }
+
+      if (mapped.gender === null) delete mapped.gender
+      if (mapped.age) delete mapped.age // not supported natively by vacancy search at the root, mostly
+      if (mapped.schedule && mapped.schedule.length === 0) delete mapped.schedule
+      if (mapped.employment && mapped.employment.length === 0) delete mapped.employment
+
+      Object.assign(formModel.value, mapped)
+      const importedKeys = Object.keys(mapped).filter(k => Array.isArray(mapped[k]) ? mapped[k].length > 0 : !!mapped[k])
+      if (importedKeys.length) {
+          message.success('Фильтры успешно заполнены AI')
+      } else {
+          message.info('AI не вернул фильтры')
+      }
     }
   } catch (e) {
     console.error('Failed to enrich filters', e)
+    message.error('Ошибка при генерации фильтров')
   }
 }
 
@@ -269,39 +367,37 @@ const handleSearch = async () => {
         <template #trigger>
           <div style="width: 100%;">
             <n-collapse>
-              <n-collapse-item name="ai-search" disabled>
+              <n-collapse-item name="ai-search">
                 <template #header>
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <n-icon :component="SparklesIcon" size="20" color="#F74C00" />
-                    <span style="color: var(--n-text-color-disabled);">Умный поиск (AI)</span>
+                    <span>Заполнить с помощью ИИ</span>
                   </div>
                 </template>
                 <n-grid :cols="1" y-gap="12">
-                  <n-form-itemGi label="Опишите, какую вакансию вы ищете (Позитивный промпт)">
+                  <n-form-itemGi label="Опишите, кто вам нужен (Позитивный промпт)">
                     <n-input
                       v-model:value="positivePrompt"
                       type="textarea"
-                      placeholder="Например:   из Нижнего Новгорода, зп от 30 до 80 тыс руб, опыт работы от 1 года до 3 лет, удаленка"
-                      disabled
+                      placeholder="Например: Бухгалтер-кассир"
                     />
                   </n-form-itemGi>
-                  <n-form-itemGi label="Чего НЕ должно быть (Негативный промпт)">
+                  <n-form-itemGi label="Опишите, кто вам НЕ нужен (Негативный промпт)">
                     <n-input
                       v-model:value="negativePrompt"
                       type="textarea"
-                      placeholder="Например: не стажировка, не в офисе"
-                      disabled
+                      placeholder="Например: без удаленки, не джуниор"
                     />
                   </n-form-itemGi>
                 </n-grid>
-                <n-button type="info" secondary block style="margin-top: 12px;" @click="handleEnrich" :loading="searchStore.isEnriching" disabled>
-                  Автозаполнение фильтров с помощью AI
+                <n-button type="info" secondary block style="margin-top: 12px;" @click="handleEnrich" :loading="searchStore.isEnriching" :disabled="!positivePrompt && !negativePrompt">
+                  Заполнить с помощью ИИ
                 </n-button>
               </n-collapse-item>
             </n-collapse>
           </div>
         </template>
-        Функция в разработке
+        Функция в разработке. Пожалуйста, предварительно проверяйте заполненную форму перед запуском поиска.
       </n-tooltip>
 
       <n-divider style="margin: 12px 0;" />
@@ -332,6 +428,9 @@ const handleSearch = async () => {
                 :min="1"
                 :max="365"
               />
+            </n-form-itemGi>
+            <n-form-itemGi :span="2" label="Метки вакансий">
+              <n-select v-model:value="formModel.vacancyLabels" :options="VACANCY_LABEL" multiple clearable />
             </n-form-itemGi>
           </n-grid>
 
@@ -429,14 +528,11 @@ const handleSearch = async () => {
           </n-grid>
 
           <!-- Extra Work Filters and Labels -->
-          <n-grid :cols="2" x-gap="12">
-            <!-- <n-form-itemGi label="Подработка / Рабочие часы">
+          <!-- <n-grid :cols="2" x-gap="12">
+            <n-form-itemGi label="Подработка / Рабочие часы">
               <n-select v-model:value="formModel.workingHours" :options="VACANCY_WORKING_HOURS" multiple clearable />
-            </n-form-itemGi> -->
-            <n-form-itemGi label="Метки вакансий">
-              <n-select v-model:value="formModel.vacancyLabels" :options="VACANCY_LABEL" multiple clearable />
             </n-form-itemGi>
-          </n-grid>
+          </n-grid> -->
 
           <!-- Expander for Additional Filters -->
           <n-collapse>

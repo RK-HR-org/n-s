@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, h } from 'vue'
 import {
-  NModal, NTree, NButton, NSpace, NInput, NSelect, NCheckbox, NText
+  NModal, NTree, NButton, NSpace, NInput, NSelect, NCheckbox, NText, NA
 } from 'naive-ui'
 import type { TreeOption } from 'naive-ui'
 import type { QueryNode } from '../model/types'
@@ -179,7 +179,7 @@ const renderLabel = ({ option }: { option: TreeOption }) => {
           checked: node.exact || false,
           onClick: (e: MouseEvent) => e.stopPropagation(),
           'onUpdate:checked': (v: boolean) => { node.exact = v }
-        }, { default: () => 'Точное совпадение (!)' }),
+        }, { default: () => 'Точное совпадение' }),
         h(NButton, {
           size: 'small',
           type: 'error',
@@ -259,6 +259,11 @@ const handleApply = () => {
         Постройте логическую структуру запроса. Используйте операторы <b>И</b> (присутствуют все слова), <b>ИЛИ</b> (присутствует хотя бы одно слово) и <b>НЕ</b> (исключить слова).<br />
         «Точное совпадение» найдет слово именно в такой форме (падеж, число), как вы указали.
       </n-text>
+      <div style="margin-top: 8px;">
+        <n-a href="https://nn.hh.ru/article/1175#uchet-slovoform" target="_blank">
+          В соответствии с документацией HH
+        </n-a>
+      </div>
     </div>
     
     <n-tree

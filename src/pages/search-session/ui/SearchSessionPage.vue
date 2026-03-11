@@ -25,12 +25,14 @@ const handlePreviewCandidate = (candidate: any) => {
     isPreviewModalVisible.value = true
 }
 
+const isLoadingAll = ref(false)
+
 onMounted(async () => {
     // 1. Fetch metadata
     await searchStore.fetchSessionMetadata(sessionId)
     searchStore.currentSessionId = sessionId
     
-    // 2. Fetch results
+    // 2. Fetch saved results from DB
     handlePageUpdate(1)
 })
 
@@ -39,6 +41,37 @@ const handlePageUpdate = (page: number) => {
     const perPage = 20
     searchStore.fetchSessionHistoryItems(sessionId, perPage, (page - 1) * perPage)
 }
+
+const handleLoadAllResults = async () => {
+    isLoadingAll.value = true
+    try {
+        await searchStore.loadAllSessionResults(sessionId)
+        currentPage.value = 1
+    } finally {
+        isLoadingAll.value = false
+    }
+}
+
+// Real total from HH API (stored in session metadata)
+const hhFoundTotal = computed(() => {
+    const meta = searchStore.currentSessionMetadata
+    if (!meta) return 0
+    // Check results array
+    if (meta.results && meta.results.length > 0) {
+        return Math.max(...meta.results.map((r: any) => r.hh_found || 0))
+    }
+    if (meta.result?.hh_found) return meta.result.hh_found
+    return searchStore.totalResults || 0
+})
+
+const savedItemsCount = computed(() => {
+    const meta = searchStore.currentSessionMetadata
+    if (!meta) return 0
+    if (meta.results && meta.results.length > 0) {
+        return meta.results.reduce((sum: number, r: any) => sum + (r.items_count || 0), 0)
+    }
+    return searchStore.searchResults?.length || 0
+})
 
 const handleTableSort = (sorter: any) => {
     console.log('Sort triggered:', sorter)
@@ -271,8 +304,22 @@ const exportToExcel = () => {
                             <n-descriptions-item label="Дата создания">
                                 {{ new Date(searchStore.currentSessionMetadata.created_at).toLocaleString('ru-RU') }}
                             </n-descriptions-item>
-                            <n-descriptions-item label="Найдено результатов">
-                                {{ searchStore.totalResults }}
+                            <n-descriptions-item label="Найдено на HH">
+                                {{ hhFoundTotal }}
+                            </n-descriptions-item>
+                            <n-descriptions-item label="Загружено результатов">
+                                {{ savedItemsCount }}
+                                <n-button 
+                                    v-if="savedItemsCount < hhFoundTotal"
+                                    type="info" 
+                                    size="tiny" 
+                                    secondary
+                                    style="margin-left: 8px;"
+                                    :loading="isLoadingAll"
+                                    @click="handleLoadAllResults"
+                                >
+                                    Загрузить все ({{ hhFoundTotal }})
+                                </n-button>
                             </n-descriptions-item>
                         </n-descriptions>
 
