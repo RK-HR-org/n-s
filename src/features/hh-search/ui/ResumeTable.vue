@@ -14,6 +14,7 @@ const emit = defineEmits<{
   (e: 'update:page', page: number): void
   (e: 'update:sorter', sorter: any): void
   (e: 'preview', row: any): void
+  (e: 'toggleHidden', payload: { itemId: string; isHidden: boolean }): void
 }>()
 
 const formatAge = (age: number) => {
@@ -84,7 +85,11 @@ const createColumns = () => {
       minWidth: 120,
       render(row: any) {
         if (!row.salary || !row.salary.amount) return h(NText, { depth: 3 }, { default: () => 'Не указана' })
-        return h(NText, null, { default: () => row.salary.amount.toLocaleString('ru-RU') })
+        let amount = row.salary.amount
+        if (row.salary.gross === true) {
+            amount = Math.round(amount * 0.87)
+        }
+        return h(NText, null, { default: () => amount.toLocaleString('ru-RU') })
       }
     },
     {
@@ -126,35 +131,45 @@ const createColumns = () => {
       title: 'Действия',
       key: 'actions',
       resizable: true,
-      minWidth: 200,
+      minWidth: 280,
       render(row: any) {
          return h(NSpace, { size: 'small' }, {
            default: () => [
-             h(
-               NButton,
-               {
-                 size: 'small',
-                 type: 'info',
-                 secondary: true,
-                 onClick: () => emit('preview', row)
-               },
-               { default: () => 'Предпросмотр' }
-             ),
-             h(
-               NButton,
-               {
-                 size: 'small',
-                 type: 'primary',
-                 secondary: true,
-                 tag: 'a',
-                 href: row.alternate_url || row.url,
-                 target: '_blank'
-               },
-               { default: () => 'HH.ru' }
-             )
-           ]
-         })
-      }
+              h(
+                NButton,
+                {
+                  size: 'small',
+                  type: 'info',
+                  secondary: true,
+                  onClick: () => emit('preview', row)
+                },
+                { default: () => 'Предпросмотр' }
+              ),
+              h(
+                NButton,
+                {
+                  size: 'small',
+                  type: 'primary',
+                  secondary: true,
+                  tag: 'a',
+                  href: row.alternate_url || row.url,
+                  target: '_blank'
+                },
+                { default: () => 'HH.ru' }
+              ),
+              row._itemId ? h(
+                NButton,
+                {
+                  size: 'small',
+                  type: row._isHidden ? 'success' : 'warning',
+                  quaternary: true,
+                  onClick: () => emit('toggleHidden', { itemId: row._itemId, isHidden: row._isHidden })
+                },
+                { default: () => row._isHidden ? 'Показать' : 'Скрыть' }
+              ) : null
+            ].filter(Boolean)
+          })
+       }
     }
   ]
 }
@@ -179,7 +194,9 @@ const sortedResumes = computed(() => {
             
             if (columnKey === 'salary') {
                 valA = a.salary?.amount || 0
+                if (a.salary?.gross === true) valA = Math.round(valA * 0.87)
                 valB = b.salary?.amount || 0
+                if (b.salary?.gross === true) valB = Math.round(valB * 0.87)
             } else if (columnKey === 'experience') {
                 valA = a.total_experience?.months || 0
                 valB = b.total_experience?.months || 0
@@ -209,6 +226,17 @@ const sortedResumes = computed(() => {
       @update:sorter="handleSorterChange"
       :bordered="false"
       size="small"
+      :row-class-name="(row: any) => row._isHidden ? 'hidden-row' : ''"
     />
   </div>
 </template>
+
+<style scoped>
+:deep(.hidden-row td) {
+  opacity: 0.45;
+  background-color: rgba(128, 128, 128, 0.06) !important;
+}
+:deep(.hidden-row:hover td) {
+  opacity: 0.7;
+}
+</style>

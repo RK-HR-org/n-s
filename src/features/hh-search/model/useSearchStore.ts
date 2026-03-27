@@ -10,9 +10,9 @@ export const useSearchStore = defineStore('hh-search', () => {
 
     const searchResults = ref<any[]>([])
     const totalResults = ref(0)
+    const showHidden = ref(false)
 
-    // Draft filters for the search form
-    const draftFilters = ref<any>({
+    const getDefaultFilters = () => ({
         position: '',
         searchPeriod: null,
         textQueries: [{ text: '', logic: 'all', field: 'everywhere', period: 'all_time' }],
@@ -48,6 +48,15 @@ export const useSearchStore = defineStore('hh-search', () => {
         orderBy: 'relevance'
     })
 
+    const draftFilters = ref<any>(getDefaultFilters())
+
+    const clearFilters = () => {
+        draftFilters.value = getDefaultFilters()
+        currentSessionId.value = null
+        searchResults.value = []
+        totalResults.value = 0
+    }
+
     // Helper to get active team ID
     const getActiveTeamId = () => {
         const userStore = useUserStore()
@@ -82,7 +91,7 @@ export const useSearchStore = defineStore('hh-search', () => {
             const executeResponse = await searchApi.executeSession(sessionId)
 
             // Map the search results correctly (handling both db row structures and direct items)
-            searchResults.value = (executeResponse.items || []).map((item: any) => item.raw_data || item)
+            searchResults.value = (executeResponse.items || []).map((item: any) => mapSearchItem(item))
             totalResults.value = executeResponse.result?.hh_found || executeResponse.found || executeResponse.total || 0
 
             return sessionId
@@ -99,7 +108,7 @@ export const useSearchStore = defineStore('hh-search', () => {
         isLoading.value = true
         try {
             const executeResponse = await searchApi.executeSession(sessionId, { page })
-            searchResults.value = (executeResponse.items || []).map((item: any) => item.raw_data || item)
+            searchResults.value = (executeResponse.items || []).map((item: any) => mapSearchItem(item))
             totalResults.value = executeResponse.result?.hh_found || executeResponse.found || executeResponse.total || 0
         } catch (e) {
             console.error('Load items error:', e)
@@ -108,13 +117,23 @@ export const useSearchStore = defineStore('hh-search', () => {
         }
     }
 
+    // Map item from API to include metadata
+    const mapSearchItem = (item: any) => {
+        const rawData = item.raw_data || item
+        return {
+            ...rawData,
+            _itemId: item.id || null,
+            _isHidden: item.is_hidden || false,
+            _isFavorite: item.is_favorite || false
+        }
+    }
+
     // Fetch items from DB for session history
     const fetchSessionHistoryItems = async (sessionId: string, limit = 1000, offset = 0) => {
         isLoading.value = true
         try {
-            const itemsResponse = await searchApi.getSessionItems(sessionId, limit, offset)
-            searchResults.value = (itemsResponse.items || []).map((item: any) => item.raw_data || item)
-            // totalResults.value = itemsResponse.total || itemsResponse.found || itemsResponse.items?.length || 0
+            const itemsResponse = await searchApi.getSessionItems(sessionId, limit, offset, showHidden.value)
+            searchResults.value = (itemsResponse.items || []).map((item: any) => mapSearchItem(item))
             if (itemsResponse.items) {
                 totalResults.value = itemsResponse.total || itemsResponse.found || itemsResponse.items.length
             }
@@ -122,6 +141,32 @@ export const useSearchStore = defineStore('hh-search', () => {
             console.error('Fetch history items error:', e)
         } finally {
             isLoading.value = false
+        }
+    }
+
+    // Optimistic toggle is_hidden
+    const toggleItemHidden = async (sessionId: string, itemId: string, currentHidden: boolean) => {
+        const newHidden = !currentHidden
+
+        // Optimistic update
+        const idx = searchResults.value.findIndex((r: any) => r._itemId === itemId)
+        if (idx !== -1) {
+            searchResults.value[idx] = { ...searchResults.value[idx], _isHidden: newHidden }
+        }
+
+        try {
+            await searchApi.updateItemFlags(sessionId, itemId, { is_hidden: newHidden })
+            // If hidden and not showing hidden items, remove from list
+            if (newHidden && !showHidden.value && idx !== -1) {
+                searchResults.value.splice(idx, 1)
+                totalResults.value = Math.max(0, totalResults.value - 1)
+            }
+        } catch (e) {
+            // Rollback
+            if (idx !== -1) {
+                searchResults.value[idx] = { ...searchResults.value[idx], _isHidden: currentHidden }
+            }
+            console.error('Toggle hidden error:', e)
         }
     }
 
@@ -218,18 +263,23 @@ export const useSearchStore = defineStore('hh-search', () => {
         isLoading.value = true
         try {
             const perPage = 20
-            const allItems: any[] = []
-            let page = 0
+            
+            // Получаем свежие метаданные сессии, чтобы узнать, сколько уже скачано
+            const meta = await searchApi.getSession(sessionId)
+            let savedItems = 0
+            if (meta.results && meta.results.length > 0) {
+                savedItems = meta.results.reduce((sum: number, r: any) => sum + (r.items_count || 0), 0)
+            }
+            
+            let page = Math.floor(savedItems / perPage)
             let realTotal = totalResults.value || 0
 
             // Fetch page by page until we have all items
-            while (allItems.length < realTotal || page === 0) {
+            while ((page * perPage) < realTotal || page === 0) {
                 const executeResponse = await searchApi.executeSession(sessionId, { page })
-                const pageItems = (executeResponse.items || []).map((item: any) => item.raw_data || item)
+                const count = (executeResponse.items || []).length
 
-                if (pageItems.length === 0) break
-
-                allItems.push(...pageItems)
+                if (count === 0) break
 
                 // Update realTotal from response
                 const responseTotal = executeResponse.result?.hh_found || executeResponse.found || executeResponse.total || 0
@@ -244,8 +294,12 @@ export const useSearchStore = defineStore('hh-search', () => {
                 if (page >= 50) break
             }
 
-            searchResults.value = allItems
-            totalResults.value = Math.max(realTotal, allItems.length)
+            // Обновляем метаданные, чтобы на экране сразу изменилась цифра "Загружено результатов"
+            const updatedMeta = await searchApi.getSession(sessionId)
+            currentSessionMetadata.value = updatedMeta
+            
+            // Возвращаем таблицу на чистую 1 страницу (считываем из локальной базы)
+            await fetchSessionHistoryItems(sessionId, perPage, 0)
         } catch (e) {
             console.error('Load all results error:', e)
         } finally {
@@ -260,6 +314,7 @@ export const useSearchStore = defineStore('hh-search', () => {
         currentSessionMetadata,
         searchResults,
         totalResults,
+        showHidden,
         draftFilters,
         sessions,
         isSessionsLoading,
@@ -267,9 +322,11 @@ export const useSearchStore = defineStore('hh-search', () => {
         submitSearch,
         loadSessionItems,
         fetchSessionHistoryItems,
+        toggleItemHidden,
         enrichFilters,
         fetchSessions,
         fetchSessionMetadata,
-        loadAllSessionResults
+        loadAllSessionResults,
+        clearFilters
     }
 })

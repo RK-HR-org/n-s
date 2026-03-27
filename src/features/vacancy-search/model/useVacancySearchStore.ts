@@ -12,11 +12,9 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
     const searchResults = ref<any[]>([])
     const totalResults = ref(0)
 
-    // Draft filters for the vacancy search form (no resume-only fields)
-    const draftFilters = ref<any>({
+    const getDefaultFilters = () => ({
         position: '',
         searchPeriod: null,
-        // По умолчанию текстовый поиск "везде"
         text: '',
         excluded_text: '',
         areas: null,
@@ -35,11 +33,19 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
         currency: 'RUR',
         industry: null,
         professionalRole: null,
-        // Vacancy-specific
         employerIds: null,
         search_field: null,
         orderBy: 'relevance'
     })
+
+    const draftFilters = ref<any>(getDefaultFilters())
+
+    const clearFilters = () => {
+        draftFilters.value = getDefaultFilters()
+        currentSessionId.value = null
+        searchResults.value = []
+        totalResults.value = 0
+    }
 
     // Helper to get active team ID
     const getActiveTeamId = () => {
@@ -158,6 +164,7 @@ export const useVacancySearchStore = defineStore('vacancy-search', () => {
         draftFilters,
         submitSearch,
         loadSessionItems,
-        enrichFilters
+        enrichFilters,
+        clearFilters
     }
 })

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NLayout, NLayoutContent, NSpace, NCard, NText, NH2, NButton, NIcon, NTag, NDescriptions, NDescriptionsItem, NCollapse, NCollapseItem } from 'naive-ui'
+import { NLayout, NLayoutContent, NSpace, NCard, NText, NH2, NButton, NIcon, NTag, NDescriptions, NDescriptionsItem, NCollapse, NCollapseItem, NSwitch } from 'naive-ui'
 import * as XLSX from 'xlsx'
 import { useSearchStore, ResumeTable, CandidatePreviewModal } from '@/features/hh-search'
-import { VacancyTable } from '@/features/vacancy-search'
+import { searchApi } from '@/features/hh-search/api/searchApi'
+import { VacancyTable, VacancyPreviewModal } from '@/features/vacancy-search'
 import {
   EDUCATION_LEVEL, EXPERIENCE, EMPLOYMENT, SCHEDULE, GENDER,
   BUSINESS_TRIP_READINESS, DRIVER_LICENSE_TYPES, JOB_SEARCH_STATUSES_APPLICANT
@@ -50,6 +51,17 @@ const handleLoadAllResults = async () => {
     } finally {
         isLoadingAll.value = false
     }
+}
+
+// Toggle show hidden items
+const handleShowHiddenChange = (val: boolean) => {
+    searchStore.showHidden = val
+    handlePageUpdate(1)
+}
+
+// Handle hide/show toggle from table
+const handleToggleHidden = (payload: { itemId: string; isHidden: boolean }) => {
+    searchStore.toggleItemHidden(sessionId, payload.itemId, payload.isHidden)
 }
 
 // Real total from HH API (stored in session metadata)
@@ -160,11 +172,44 @@ const formattedFilters = computed(() => {
 
 const isExporting = ref(false)
 
-const exportToExcel = () => {
+const exportToExcel = async () => {
     isExporting.value = true
     try {
-        const resumes = searchStore.searchResults || []
-        if (resumes.length === 0) return
+        // Запросом извлекаем все элементы порциями по 500 (максимальный лимит API)
+        let allFetchedItems: any[] = []
+        let currentOffset = 0
+        const batchSize = 500
+        
+        while (true) {
+            const response = await searchApi.getSessionItems(sessionId, batchSize, currentOffset, false)
+            const batchItems = response.items || []
+            
+            if (batchItems.length === 0) {
+                break
+            }
+            
+            const mappedBatch = batchItems.map((dbItem: any) => {
+                const rawData = dbItem.raw_data || dbItem
+                 return {
+                    ...rawData,
+                    _itemId: dbItem.id || null,
+                    _isHidden: dbItem.is_hidden || false,
+                    _isFavorite: dbItem.is_favorite || false
+                }
+            })
+            
+            allFetchedItems = allFetchedItems.concat(mappedBatch)
+            currentOffset += batchSize
+            
+            if (batchItems.length < batchSize) {
+                break // Оптимизация: если пришло меньше запрошенного числа, значит это конец
+            }
+        }
+
+        if (allFetchedItems.length === 0) {
+            isExporting.value = false
+            return
+        }
 
         let partKomPosition = ''
         const f = searchStore.currentSessionMetadata?.query_raw || searchStore.currentSessionMetadata?.filters
@@ -178,7 +223,22 @@ const exportToExcel = () => {
             }
         }
 
-        const data = displayResults.value.map((item: any) => {
+        let itemsToExport: any[] = []
+        if (isVacancyMode.value) {
+            allFetchedItems.forEach((res: any) => {
+                if (res.hh_response_json && res.hh_response_json.items) {
+                    itemsToExport = itemsToExport.concat(res.hh_response_json.items)
+                } else if (res.items) {
+                    itemsToExport = itemsToExport.concat(res.items)
+                } else {
+                   itemsToExport.push(res)
+                }
+            })
+        } else {
+            itemsToExport = allFetchedItems
+        }
+
+        const data = itemsToExport.map((item: any) => {
             if (isVacancyMode.value) {
                 // Vacancy mapping
                 let employmentName = item.employment?.name || item.employment_form?.name || ''
@@ -190,6 +250,13 @@ const exportToExcel = () => {
 
                 const scheduleName = item.schedule?.name || item.work_schedule?.name || item.work_schedule_by_days?.map((s:any) => s.name).join(', ') || ''
 
+                let salaryFrom = item.salary?.from || ''
+                let salaryTo = item.salary?.to || ''
+                if (item.salary?.gross === true) {
+                    if (salaryFrom) salaryFrom = Math.round(salaryFrom * 0.87)
+                    if (salaryTo) salaryTo = Math.round(salaryTo * 0.87)
+                }
+
                 return {
                     'Резюме/Вакансия': 'Вакансия',
                     'Источник (ссылка)': item.alternate_url || item.url || '',
@@ -198,8 +265,8 @@ const exportToExcel = () => {
                     'Компания': item.employer?.name || '',
                     'Наименование позиции/вакансии': item.name || item.title || '',
                     'Наименование должности в ПартКом': partKomPosition,
-                    'Зарплата от': item.salary?.from || '',
-                    'Зарплата до': item.salary?.to || '',
+                    'Зарплата от': salaryFrom,
+                    'Зарплата до': salaryTo,
                     'Профобласть вакансии': item.professional_roles?.map((r: any) => r.name).join(', ') || '',
                     'Ключевые навыки': item.key_skills?.map((s:any) => s.name).join(', ') || '',
                     'Тип занятости': employmentName,
@@ -235,6 +302,11 @@ const exportToExcel = () => {
                 const empStr = (item.employment || []).map((e: any) => e.name).join(', ')
                 const schedStr = (item.schedules || []).map((s: any) => s.name).join(', ')
 
+                let salaryAmount = item.salary?.amount || ''
+                if (item.salary?.gross === true && salaryAmount) {
+                    salaryAmount = Math.round(salaryAmount * 0.87)
+                }
+
                 return {
                     'Резюме/Вакансия': 'Резюме',
                     'Источник (ссылка)': item.alternate_url || item.url || '',
@@ -243,7 +315,7 @@ const exportToExcel = () => {
                     'Компания': lastCompany,
                     'Наименование позиции/вакансии': item.title || lastPosition || '',
                     'Наименование должности в ПартКом': partKomPosition,
-                    'Зарплата от': item.salary?.amount || '',
+                    'Зарплата от': salaryAmount,
                     'Зарплата до': '',
                     'Профобласть вакансии': item.professional_roles?.map((r: any) => r.name).join(', ') || '',
                     'Ключевые навыки': skillsStr,
@@ -334,18 +406,23 @@ const exportToExcel = () => {
                                 <n-text depth="3" v-else>Нет фильтров</n-text>
                             </n-space>
                         </div>
-                        <!-- <n-collapse style="margin-top: 16px;">
-                            <n-collapse-item title="Сырые данные (JSON)" name="filters">
-                                <pre style="background-color: var(--n-color-modal); padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 13px;">{{ JSON.stringify(searchStore.currentSessionMetadata.query_raw || searchStore.currentSessionMetadata.filters, null, 2) }}</pre>
-                            </n-collapse-item>
-                        </n-collapse> -->
                     </template>
                 </n-card>
 
                 <n-card bordered>
                     <template #header>
                         <n-space justify="space-between" align="center">
-                            <span>{{ isVacancyMode ? 'Вакансии' : 'Кандидаты' }}</span>
+                            <n-space align="center" :size="16">
+                                <span>{{ isVacancyMode ? 'Вакансии' : 'Кандидаты' }}</span>
+                                <n-space align="center" :size="8">
+                                    <n-switch 
+                                        :value="searchStore.showHidden" 
+                                        @update:value="handleShowHiddenChange"
+                                        size="small"
+                                    />
+                                    <n-text depth="3" style="font-size: 13px; font-weight: 400;">Показать скрытые</n-text>
+                                </n-space>
+                            </n-space>
                             <n-button 
                                 type="success" 
                                 size="small" 
@@ -372,6 +449,8 @@ const exportToExcel = () => {
                             :per-page="20"
                             @update:page="handlePageUpdate"
                             @update:sorter="handleTableSort"
+                            @preview="handlePreviewCandidate"
+                            @toggle-hidden="handleToggleHidden"
                         />
                         <ResumeTable 
                             v-else
@@ -383,6 +462,7 @@ const exportToExcel = () => {
                             @update:page="handlePageUpdate"
                             @update:sorter="handleTableSort"
                             @preview="handlePreviewCandidate"
+                            @toggle-hidden="handleToggleHidden"
                         />
                     </template>
                     <template v-else-if="!searchStore.isLoading">
@@ -392,7 +472,13 @@ const exportToExcel = () => {
 
             </n-space>
         </n-layout-content>
+        <VacancyPreviewModal
+            v-if="isVacancyMode"
+            v-model:show="isPreviewModalVisible"
+            :vacancy="previewCandidate"
+        />
         <CandidatePreviewModal
+            v-else
             v-model:show="isPreviewModalVisible"
             :candidate="previewCandidate"
         />

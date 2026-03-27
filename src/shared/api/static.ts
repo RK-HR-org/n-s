@@ -70,6 +70,18 @@ export const staticApi = {
     },
 
     /**
+     * Search areas (regions) for async autocomplete
+     */
+    async getAreaSuggestions(text: string): Promise<{ id: string; text: string }[]> {
+        if (!text.trim()) return [];
+        const res = await apiClient<any>(`/v1/static/suggest/areas?text=${encodeURIComponent(text)}`);
+        const items: any[] = Array.isArray(res?.items) ? res.items : [];
+        return items
+            .filter((item: any) => item?.id && item?.text)
+            .map((item: any) => ({ id: String(item.id), text: item.text }));
+    },
+
+    /**
      * Suggest positions (generic, mostly for resume search "position/title")
      */
     async getPositionsSuggestions(text: string): Promise<string[]> {
