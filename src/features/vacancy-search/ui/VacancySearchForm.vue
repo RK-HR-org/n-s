@@ -161,14 +161,40 @@ onMounted(() => {
 })
 
 // Mappers for Naive UI TreeSelect
-const areaOptions = computed(() => {
-  const mapArea = (area: any): any => ({
-    key: area.id,
-    label: area.name,
-    children: area.areas && area.areas.length > 0 ? area.areas.map(mapArea) : undefined
-  })
-  return areas.value.map(mapArea)
-})
+const areaOptions = ref<{label: string, value: string}[]>([])
+const isAreaLoading = ref(false)
+let areaSuggestTimer: number | undefined
+
+const handleAreaSearch = (query: string) => {
+  if (!query || query.trim().length === 0) {
+     areaOptions.value = areaOptions.value.filter(opt => formModel.value.areas?.includes(opt.value))
+     return
+  }
+
+  isAreaLoading.value = true
+  if (areaSuggestTimer) window.clearTimeout(areaSuggestTimer)
+
+  areaSuggestTimer = window.setTimeout(async () => {
+    try {
+      const suggestions = await staticApi.getAreaSuggestions(query)
+      const newOpts = suggestions.map(s => ({ label: s.text, value: s.id }))
+
+      const currentSelected = areaOptions.value.filter(opt => formModel.value.areas?.includes(opt.value))
+
+      const merged = [...currentSelected]
+      newOpts.forEach(n => {
+          if (!merged.find(m => m.value === n.value)) {
+              merged.push(n)
+          }
+      })
+      areaOptions.value = merged
+    } catch (e) {
+      console.error('Failed to fetch area suggestions', e)
+    } finally {
+      isAreaLoading.value = false
+    }
+  }, 300)
+}
 
 const roleOptions = computed(() => {
   return professionalRoles.value.map(cat => ({
@@ -475,15 +501,17 @@ const handleSearch = async () => {
           <!-- Geography -->
           <n-grid :cols="2" x-gap="12">
             <n-form-itemGi label="Регион">
-              <n-tree-select
+              <n-select
                 v-model:value="formModel.areas"
-                :options="areaOptions"
                 multiple
-                cascade
-                checkable
                 filterable
+                remote
                 clearable
-                placeholder="Выберите регионы"
+                placeholder="Введите регион для поиска..."
+                :options="areaOptions"
+                :loading="isAreaLoading"
+                @search="handleAreaSearch"
+                :fallback-option="(value) => ({ label: 'Регион ' + value, value })"
               />
             </n-form-itemGi>
             <n-form-itemGi label="Работодатели (поиск по названию компании)">

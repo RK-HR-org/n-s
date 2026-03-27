@@ -124,9 +124,16 @@ export const searchApi = {
         })
     },
 
-    getSessionItems(sessionId: string, limit = 20, offset = 0) {
-        return apiClient<any>(`/v1/search/sessions/${sessionId}/items?limit=${limit}&offset=${offset}`, {
+    getSessionItems(sessionId: string, limit = 20, offset = 0, includeHidden = false) {
+        return apiClient<any>(`/v1/search/sessions/${sessionId}/items?limit=${limit}&offset=${offset}&include_hidden=${includeHidden}`, {
             method: 'GET'
+        })
+    },
+
+    updateItemFlags(sessionId: string, itemId: string, body: { is_hidden?: boolean; is_favorite?: boolean }) {
+        return apiClient<any>(`/v1/search/sessions/${sessionId}/items/${itemId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(body)
         })
     },
 
