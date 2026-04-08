@@ -23,6 +23,13 @@ export const EXPERIENCE: Option[] = [
   { value: "moreThan6", label: "Более 6 лет" },
 ];
 
+export const FILTER_EXP_PERIOD: Option[] = [
+  { value: 'all_time', label: 'За все время' },
+  { value: 'last_year', label: 'За последний год' },
+  { value: 'last_three_years', label: 'За последние 3 года' },
+  { value: 'last_six_years', label: 'За последние 6 лет' }
+];
+
 export const EMPLOYMENT: Option[] = [
   { value: "full", label: "Полная занятость" },
   { value: "part", label: "Частичная занятость" },

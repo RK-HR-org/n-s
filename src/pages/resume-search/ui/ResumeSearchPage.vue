@@ -15,7 +15,7 @@ const handlePageUpdate = (page: number) => {
 
 import { computed } from 'vue'
 import {
-  EDUCATION_LEVEL, EXPERIENCE, EMPLOYMENT, SCHEDULE, GENDER
+  EDUCATION_LEVEL, EXPERIENCE, EMPLOYMENT, SCHEDULE, GENDER, FILTER_EXP_PERIOD
 } from '@/shared/constants/hhDictionaries'
 import { useDictionaryStore } from '@/entities/dictionary'
 
@@ -77,6 +77,26 @@ const formattedFilters = computed(() => {
     // Experience & Employment
     const expTags = getDictTags(f.experience, EXPERIENCE)
     if (expTags.length) items.push({ label: 'Опыт работы', tags: expTags })
+
+    // Industry experience
+    if (f.filterExpIndustry && f.filterExpIndustry.length) {
+        const indTags = f.filterExpIndustry.map((id: string) => {
+            for (const ind of (dictStore.industries as any[])) {
+                if (String(ind.id) === String(id)) return ind.name
+                if (ind.industries) {
+                    const sub = ind.industries.find((i: any) => String(i.id) === String(id))
+                    if (sub) return sub.name
+                }
+            }
+            return id
+        })
+        items.push({ label: 'Опыт в отрасли', tags: indTags })
+    }
+
+    if (f.filterExpPeriod) {
+        const periodLabel = FILTER_EXP_PERIOD.find(p => p.value === f.filterExpPeriod)?.label || f.filterExpPeriod
+        items.push({ label: 'Период в отрасли', tags: [periodLabel] })
+    }
 
     const empTags = getDictTags(f.employment, EMPLOYMENT)
     if (empTags.length) items.push({ label: 'Занятость', tags: empTags })

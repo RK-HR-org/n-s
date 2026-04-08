@@ -30,6 +30,8 @@ export interface AdvancedSearchFiltersDTO {
     period?: number | null
     educationLevels?: string[] | null
     experience?: string[] | null
+    filterExpIndustry?: string[] | null
+    filterExpPeriod?: string | null
     employment?: string[] | null
     schedule?: string[] | null
     skills?: number[] | null
