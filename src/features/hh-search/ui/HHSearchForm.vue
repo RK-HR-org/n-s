@@ -520,7 +520,7 @@ const handleSearch = async () => {
           </n-grid>
           <n-grid :cols="2" x-gap="12">
             <n-form-itemGi label="Опыт в отрасли">
-              <n-tree-select v-model:value="formModel.filterExpIndustry" :options="industryOptions" multiple cascade checkable filterable clearable placeholder="Выберите отрасль..." />
+              <n-tree-select v-model:value="formModel.filterExpIndustry" :options="industryOptions" multiple cascade checkable clearable placeholder="Выберите отрасль..." />
             </n-form-itemGi>
             <n-form-itemGi label="Период работы в отрасли">
               <n-select v-model:value="formModel.filterExpPeriod" :options="FILTER_EXP_PERIOD" clearable :disabled="!isIndustrySelected" />
