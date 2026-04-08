@@ -7,7 +7,7 @@ import { storeToRefs } from 'pinia'
 import { useDictionaryStore } from '@/entities/dictionary'
 import {
   EDUCATION_LEVEL, EXPERIENCE, EMPLOYMENT, SCHEDULE, GENDER, RESUME_SEARCH_ORDER, CURRENCY_OPTIONS,
-  RESUME_SEARCH_RELOCATION, BUSINESS_TRIP_READINESS, DRIVER_LICENSE_TYPES, JOB_SEARCH_STATUSES_APPLICANT, RESUME_SEARCH_LABEL
+  RESUME_SEARCH_RELOCATION, BUSINESS_TRIP_READINESS, DRIVER_LICENSE_TYPES, JOB_SEARCH_STATUSES_APPLICANT, RESUME_SEARCH_LABEL, FILTER_EXP_PERIOD
 } from '@/shared/constants/hhDictionaries'
 import SparklesIcon from '@/shared/ui/icons/SparklesIcon.vue'
 import { useSearchStore } from '../model/useSearchStore'
@@ -160,7 +160,20 @@ const handleEnrich = async () => {
 
 // Dictionary store
 const dictStore = useDictionaryStore()
-const { areas, professionalRoles, isLoading } = storeToRefs(dictStore)
+const { areas, professionalRoles, industries, isLoading } = storeToRefs(dictStore)
+
+const industryOptions = computed(() => {
+  return industries.value.map((i: any) => ({ 
+    label: i.name, 
+    key: i.id,
+    children: i.industries && i.industries.length > 0
+      ? i.industries.map((sub: any) => ({
+          label: sub.name,
+          key: sub.id
+        }))
+      : undefined
+  }))
+})
 
 onMounted(() => {
   dictStore.fetchAll()
@@ -237,6 +250,11 @@ const TEXT_QUERY_PERIODS = [
   { value: 'last_three_years', label: 'За последние 3 года' },
   { value: 'last_six_years', label: 'За последние 6 лет' }
 ]
+
+// Check if industry is selected
+const isIndustrySelected = computed(() => {
+  return formModel.value.filterExpIndustry && formModel.value.filterExpIndustry.length > 0
+})
 
 const onCreateTextQuery = () => {
   return {
@@ -498,6 +516,14 @@ const handleSearch = async () => {
             </n-form-itemGi>
             <n-form-itemGi label="График работы">
               <n-select v-model:value="formModel.schedule" :options="SCHEDULE" multiple clearable />
+            </n-form-itemGi>
+          </n-grid>
+          <n-grid :cols="2" x-gap="12">
+            <n-form-itemGi label="Опыт в отрасли">
+              <n-tree-select v-model:value="formModel.filterExpIndustry" :options="industryOptions" multiple cascade checkable filterable clearable placeholder="Выберите отрасль..." />
+            </n-form-itemGi>
+            <n-form-itemGi label="Период работы в отрасли">
+              <n-select v-model:value="formModel.filterExpPeriod" :options="FILTER_EXP_PERIOD" clearable :disabled="!isIndustrySelected" />
             </n-form-itemGi>
           </n-grid>
 
